@@ -1,0 +1,51 @@
+{
+  "name": "open-geo",
+  "version": "0.1.0",
+  "description": "Open-source, AI-Native Generative Engine Optimization (GEO) & Technical Audit CLI",
+  "type": "module",
+  "bin": {
+    "open-geo": "./dist/cli/index.js",
+    "opengeo": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli/index.ts",
+    "start": "node dist/cli/index.js",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "geo",
+    "generative-engine-optimization",
+    "seo",
+    "ai-search",
+    "mcp",
+    "claude-code",
+    "cursor",
+    "perplexity",
+    "chatgpt-search",
+    "llms-txt"
+  ],
+  "author": "geofn.com & OpenGEO Community",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "chalk": "^5.4.1",
+    "cheerio": "^1.0.0",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "ora": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
