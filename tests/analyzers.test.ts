@@ -109,4 +109,14 @@ Disallow: /admin
       }
     });
   });
+
+  describe("URL Normalization & Bare Domain Resilience", () => {
+    it("handles URLs without https:// prefix smoothly across all audit engines", async () => {
+      const { normalizeUrl } = await import("../src/lib/url.js");
+      expect(normalizeUrl("tryprofound.com")).toBe("https://tryprofound.com");
+      expect(normalizeUrl("www.example.com/pricing")).toBe("https://www.example.com/pricing");
+      expect(normalizeUrl("http://localhost:3000")).toBe("http://localhost:3000");
+      expect(normalizeUrl("https://geofn.com")).toBe("https://geofn.com");
+    });
+  });
 });

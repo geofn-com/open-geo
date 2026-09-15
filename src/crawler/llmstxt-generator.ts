@@ -2,6 +2,7 @@ import * as cheerio from "cheerio";
 import { UniversalLLMProber } from "../probers/llm.js";
 import type { LlmsTxtOutput, PageInfo } from "../types/index.js";
 import { USER_AGENT as CRAWLER_USER_AGENT } from "../lib/version.js";
+import { normalizeUrl } from "../lib/url.js";
 
 /**
  * Categorizes a page URL into functional sections
@@ -122,7 +123,8 @@ export async function generateLlmsTxt(options: {
   maxPages?: number;
   includeFull?: boolean;
 }): Promise<LlmsTxtOutput> {
-  const { url, maxPages = 15, includeFull = false } = options;
+  const { url: rawUrl, maxPages = 15, includeFull = false } = options;
+  const url = normalizeUrl(rawUrl);
   const baseUrl = new URL(url);
   const origin = baseUrl.origin;
 

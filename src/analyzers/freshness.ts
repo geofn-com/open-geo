@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { ContentFreshnessReport, FreshnessPageItem } from "../types/index.js";
+import { normalizeUrl } from "../lib/url.js";
 
 export interface AuditContentFreshnessOptions {
   url: string;
@@ -19,13 +20,12 @@ function parseSitemapUrls(xmlText: string, maxPages: number): FreshnessPageItem[
     if (items.length >= maxPages) return;
     const loc = $(el).find("loc").text().trim();
     const lastmod = $(el).find("lastmod").text().trim();
-
     if (loc) {
       let ageInDays = 30;
       if (lastmod) {
-        const parsedDate = new Date(lastmod).getTime();
-        if (!isNaN(parsedDate)) {
-          ageInDays = Math.max(0, Math.round((now - parsedDate) / (1000 * 3600 * 24)));
+        const lastmodTime = new Date(lastmod).getTime();
+        if (!isNaN(lastmodTime)) {
+          ageInDays = Math.max(0, Math.round((now - lastmodTime) / (1000 * 60 * 60 * 24)));
         }
       }
 
@@ -52,7 +52,7 @@ function parseSitemapUrls(xmlText: string, maxPages: number): FreshnessPageItem[
 export async function auditContentFreshness(
   options: AuditContentFreshnessOptions | string
 ): Promise<ContentFreshnessReport> {
-  const targetUrl = typeof options === "string" ? options : options.url;
+  const targetUrl = normalizeUrl(typeof options === "string" ? options : options.url);
   const maxPages = typeof options === "object" ? options.maxPages || 15 : 15;
   const mockPages = typeof options === "object" ? options.mockPages : undefined;
 

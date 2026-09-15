@@ -33,10 +33,14 @@ export interface DiagnoseGeoFailuresOptions {
 /**
  * Executes multi-dimensional GEO Failure Typology and Triage
  */
+import { normalizeUrl } from "../lib/url.js";
+
 export async function diagnoseGeoFailures(
   options: DiagnoseGeoFailuresOptions
 ): Promise<FailureDiagnosisReport> {
-  const { url, brand: userBrand } = options;
+  const rawUrl = options.url;
+  const url = normalizeUrl(rawUrl);
+  const userBrand = options.brand;
 
   let host = "";
   try {

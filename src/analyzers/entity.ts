@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { EntityConsistencyReport, EntityVariant } from "../types/index.js";
+import { normalizeUrl } from "../lib/url.js";
 
 /**
  * Normalizes text to compare base brand tokens
@@ -9,24 +10,22 @@ function cleanToken(str: string): string {
 }
 
 /**
- * Scans a target webpage to check brand entity consistency and drift across Title, H1, Schema and Body
+ * Audits entity name consistency across Title, H1, Schema.org Organization, and Meta tags
  */
 export async function auditEntityConsistency(
-  targetUrl: string,
+  rawTargetUrl: string,
   providedBrand?: string,
-  htmlContent?: string
+  rawHtml?: string
 ): Promise<EntityConsistencyReport> {
-  let html = htmlContent || "";
-
+  const targetUrl = normalizeUrl(rawTargetUrl);
+  let html = rawHtml || "";
   if (!html) {
     try {
       const res = await fetch(targetUrl, {
         headers: { "User-Agent": "open-geo-entity-audit/1.0" },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(8000),
       });
-      if (res.ok) {
-        html = await res.text();
-      }
+      if (res.ok) html = await res.text();
     } catch {
       // fallback
     }

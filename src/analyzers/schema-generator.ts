@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { SchemaGeneratorReport } from "../types/index.js";
+import { normalizeUrl } from "../lib/url.js";
 
 export interface GenerateSchemaOptions {
   url: string;
@@ -15,7 +16,7 @@ export interface GenerateSchemaOptions {
 export async function generateFullSchema(
   options: GenerateSchemaOptions | string
 ): Promise<SchemaGeneratorReport> {
-  const targetUrl = typeof options === "string" ? options : options.url;
+  const targetUrl = normalizeUrl(typeof options === "string" ? options : options.url);
   const brandName = typeof options === "object" ? options.brandName : undefined;
   let html = typeof options === "object" ? options.htmlContent || "" : "";
 

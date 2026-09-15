@@ -19,6 +19,7 @@ import { auditContentFreshness } from "../analyzers/freshness.js";
 import { generateFullSchema } from "../analyzers/schema-generator.js";
 import { diagnoseGeoFailures } from "../analyzers/failure-triage.js";
 import { VERSION } from "../lib/version.js";
+import { normalizeUrl } from "../lib/url.js";
 
 /**
  * Starts the OpenGEO native MCP Server over stdio (Community Edition)
@@ -179,10 +180,10 @@ export async function startMcpServer() {
         }
 
         case "geo_generate_faq": {
-          const input = String(args?.urlOrText);
-          const isUrl = /^https?:\/\//i.test(input);
+          const input = String(args?.urlOrText).trim();
+          const isUrl = /^https?:\/\//i.test(input) || (!input.includes(" ") && input.includes("."));
           const res = await generateFaq({
-            url: isUrl ? input : undefined,
+            url: isUrl ? normalizeUrl(input) : undefined,
             text: isUrl ? undefined : input,
             count: args?.count ? Number(args.count) : 6,
           });

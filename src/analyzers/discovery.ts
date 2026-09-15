@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { DiscoveryStackReport } from "../types/index.js";
+import { normalizeUrl } from "../lib/url.js";
 
 async function probeUrl(url: string): Promise<boolean> {
   try {
@@ -17,7 +18,8 @@ async function probeUrl(url: string): Promise<boolean> {
 /**
  * Audits a website's AI Discovery Stack protocols
  */
-export async function auditDiscoveryStack(targetUrl: string): Promise<DiscoveryStackReport> {
+export async function auditDiscoveryStack(rawTargetUrl: string): Promise<DiscoveryStackReport> {
+  const targetUrl = normalizeUrl(rawTargetUrl);
   const urlObj = new URL(targetUrl);
   const base = urlObj.origin;
 

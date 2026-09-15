@@ -212,10 +212,13 @@ export function checkBotAllowedInRobots(
   return { allowed: true, ruleMatched: "Allowed by default" };
 }
 
+import { normalizeUrl } from "../lib/url.js";
+
 /**
  * Audits a target website's robots.txt against 14 AI bot definitions and fatal GEO patterns
  */
-export async function auditRobotsTxt(targetUrl: string): Promise<RobotsAuditReport> {
+export async function auditRobotsTxt(rawTargetUrl: string): Promise<RobotsAuditReport> {
+  const targetUrl = normalizeUrl(rawTargetUrl);
   const urlObj = new URL(targetUrl);
   const robotsUrl = `${urlObj.origin}/robots.txt`;
 

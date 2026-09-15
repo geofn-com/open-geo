@@ -3,15 +3,17 @@ import { auditRobotsTxt } from "./robots.js";
 import { auditContentCitability } from "./content.js";
 import { auditEntityConsistency } from "./entity.js";
 import type { GeoSimulateReport } from "../types/index.js";
+import { normalizeUrl } from "../lib/url.js";
 
 /**
  * Zero-Token / No-Key GEO Score Simulator
  * Synthesizes Discovery Stack, Robots Crawlability, Content Citability, and Entity Consistency.
  */
 export async function simulateGeoScore(
-  targetUrl: string,
+  rawTargetUrl: string,
   brandName?: string
 ): Promise<GeoSimulateReport> {
+  const targetUrl = normalizeUrl(rawTargetUrl);
   const domain = new URL(targetUrl).hostname.replace(/^www\./, "");
 
   // Run all zero-token analyzers concurrently

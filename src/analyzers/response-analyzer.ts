@@ -58,10 +58,13 @@ const IGNORED_DOMAINS = [
   "test.com",
 ];
 
+import { normalizeUrl } from "../lib/url.js";
+
 /**
  * Verifies if an HTTP URL is genuinely reachable (anti-hallucination check)
  */
-async function verifyUrlReachable(targetUrl: string): Promise<VerifiedCitation> {
+async function verifyUrlReachable(rawTargetUrl: string): Promise<VerifiedCitation> {
+  const targetUrl = normalizeUrl(rawTargetUrl);
   const urlObj = new URL(targetUrl);
   const domain = urlObj.hostname;
 

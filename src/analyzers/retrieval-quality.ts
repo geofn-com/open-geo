@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { RetrievalQualityReport } from "../types/index.js";
+import { normalizeUrl } from "../lib/url.js";
 
 export interface AuditRetrievalQualityOptions {
   url: string;
@@ -13,7 +14,7 @@ export interface AuditRetrievalQualityOptions {
 export async function auditRetrievalQuality(
   options: AuditRetrievalQualityOptions | string
 ): Promise<RetrievalQualityReport> {
-  const targetUrl = typeof options === "string" ? options : options.url;
+  const targetUrl = normalizeUrl(typeof options === "string" ? options : options.url);
   let html = typeof options === "object" ? options.htmlContent || "" : "";
   let redirectsCount = 0;
 

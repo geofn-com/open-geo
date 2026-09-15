@@ -2,11 +2,13 @@ import * as cheerio from "cheerio";
 import type { TechnicalAuditReport } from "../types/index.js";
 import { checkBotAllowedInRobots } from "../analyzers/robots.js";
 import { USER_AGENT as DEFAULT_USER_AGENT } from "../lib/version.js";
+import { normalizeUrl } from "../lib/url.js";
 
 /**
  * Perform deep local semantic & technical audit of a webpage for GEO readiness
  */
-export async function auditWebpage(targetUrl: string): Promise<TechnicalAuditReport> {
+export async function auditWebpage(rawTargetUrl: string): Promise<TechnicalAuditReport> {
+  const targetUrl = normalizeUrl(rawTargetUrl);
   const parsedUrl = new URL(targetUrl);
   const origin = parsedUrl.origin;
 

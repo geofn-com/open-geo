@@ -14,6 +14,7 @@ import { runCommunityProbe } from "../core/prober.js";
 import { formatGeoMarkdownReport, formatAuditMarkdownReport, formatFanoutMarkdownReport } from "../reporters/markdown.js";
 import { startMcpServer } from "../mcp/server.js";
 import { VERSION } from "../lib/version.js";
+import { normalizeUrl } from "../lib/url.js";
 
 const program = new Command();
 
