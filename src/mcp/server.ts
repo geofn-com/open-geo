@@ -18,6 +18,7 @@ import { auditRetrievalQuality } from "../analyzers/retrieval-quality.js";
 import { auditContentFreshness } from "../analyzers/freshness.js";
 import { generateFullSchema } from "../analyzers/schema-generator.js";
 import { diagnoseGeoFailures } from "../analyzers/failure-triage.js";
+import { VERSION } from "../lib/version.js";
 
 /**
  * Starts the OpenGEO native MCP Server over stdio (Community Edition)
@@ -26,7 +27,7 @@ export async function startMcpServer() {
   const server = new Server(
     {
       name: "open-geo",
-      version: "0.1.0",
+      version: VERSION,
     },
     {
       capabilities: {

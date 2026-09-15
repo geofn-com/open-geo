@@ -21,3 +21,4 @@ export * from "./probers/base.js";
 export * from "./probers/llm.js";
 export * from "./reporters/markdown.js";
 export * from "./mcp/server.js";
+export * from "./lib/version.js";

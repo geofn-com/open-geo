@@ -1,6 +1,6 @@
 {
   "name": "open-geo",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Open-source, AI-Native Generative Engine Optimization (GEO) & Technical Audit CLI",
   "type": "module",
   "bin": {
@@ -32,7 +32,11 @@
     "chatgpt-search",
     "llms-txt"
   ],
-  "author": "geofn.com & OpenGEO Community",
+  "author": {
+    "name": "OpenGEO Community",
+    "email": "contact@geofn.com",
+    "url": "https://geofn.com"
+  },
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",

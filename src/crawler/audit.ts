@@ -1,8 +1,7 @@
 import * as cheerio from "cheerio";
 import type { TechnicalAuditReport } from "../types/index.js";
 import { checkBotAllowedInRobots } from "../analyzers/robots.js";
-
-const DEFAULT_USER_AGENT = "open-geo/0.1.0 (+https://github.com/geofn-com/open-geo)";
+import { USER_AGENT as DEFAULT_USER_AGENT } from "../lib/version.js";
 
 /**
  * Perform deep local semantic & technical audit of a webpage for GEO readiness

@@ -1,8 +1,7 @@
 import * as cheerio from "cheerio";
 import { UniversalLLMProber } from "../probers/llm.js";
 import type { LlmsTxtOutput, PageInfo } from "../types/index.js";
-
-const CRAWLER_USER_AGENT = "open-geo/0.1.0 (+https://github.com/geofn-com/open-geo)";
+import { USER_AGENT as CRAWLER_USER_AGENT } from "../lib/version.js";
 
 /**
  * Categorizes a page URL into functional sections

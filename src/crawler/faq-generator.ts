@@ -1,8 +1,7 @@
 import * as cheerio from "cheerio";
 import { UniversalLLMProber } from "../probers/llm.js";
 import type { FaqItem, FaqOutput } from "../types/index.js";
-
-const FAQ_USER_AGENT = "open-geo/0.1.0 (+https://github.com/geofn-com/open-geo)";
+import { USER_AGENT as FAQ_USER_AGENT } from "../lib/version.js";
 
 /**
  * Generate high-impact FAQs and Schema.org JSON-LD markup for a webpage or text content

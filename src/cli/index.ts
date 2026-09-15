@@ -11,12 +11,9 @@ import { generateFaq } from "../crawler/faq-generator.js";
 import { getUnifiedSuggestions } from "../sources/suggest.js";
 import { analyzeQueryFanout } from "../core/fanout-generator.js";
 import { runCommunityProbe } from "../core/prober.js";
-import {
-  formatGeoMarkdownReport,
-  formatAuditMarkdownReport,
-  formatFanoutMarkdownReport,
-} from "../reporters/markdown.js";
+import { formatGeoMarkdownReport, formatAuditMarkdownReport, formatFanoutMarkdownReport } from "../reporters/markdown.js";
 import { startMcpServer } from "../mcp/server.js";
+import { VERSION } from "../lib/version.js";
 
 const program = new Command();
 
@@ -33,7 +30,7 @@ function printCommercialHook(): void {
 program
   .name("open-geo")
   .description("🚀 AI-Native Generative Engine Optimization (GEO) & Technical Audit CLI (Community Edition)")
-  .version("0.1.0");
+  .version(VERSION);
 
 // 1. Command: Audit Webpage for GEO Readiness (Primary Community Hook)
 program
