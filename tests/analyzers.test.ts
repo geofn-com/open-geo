@@ -119,4 +119,38 @@ Disallow: /admin
       expect(normalizeUrl("https://geofn.com")).toBe("https://geofn.com");
     });
   });
+
+  describe("Next.js RSC Stream Schema.org Heuristic Detection", () => {
+    it("detects and triages Schema.org inside RSC payloads without standard script tags", async () => {
+      const { auditWebpage } = await import("../src/crawler/audit.js");
+      const rscSampleHtml = `
+        <!DOCTYPE html>
+        <html>
+          <head><title>Profound - Next.js App</title></head>
+          <body>
+            <h1>AI Search Optimization</h1>
+            <script>self.__next_f.push([1,"{\\"@context\\":\\"https://schema.org\\",\\"@graph\\":[{\\"@type\\":\\"Organization\\",\\"name\\":\\"Profound\\",\\"url\\":\\"https://www.tryprofound.com\\"}]}"])</script>
+          </body>
+        </html>
+      `;
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+        const urlStr = typeof input === "string" ? input : input.toString();
+        if (urlStr.includes("llms.txt")) return new Response("Not Found", { status: 404 });
+        if (urlStr.includes("robots.txt")) return new Response("User-agent: *\nAllow: /", { status: 200 });
+        return new Response(rscSampleHtml, { status: 200, headers: { "Content-Type": "text/html" } });
+      });
+
+      try {
+        const result = await auditWebpage("tryprofound.com");
+        expect(result.schemaMarkup.hasJsonLd).toBe(true);
+        expect(result.schemaMarkup.deliveryMethod).toBe("dynamic_rsc");
+        expect(result.schemaMarkup.schemaTypes).toContain("Organization");
+        expect(result.schemaMarkup.details).toContain("Next.js RSC stream payload");
+        expect(result.recommendations.some((r) => r.includes("RSC stream payload"))).toBe(true);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
 });

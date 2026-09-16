@@ -70,6 +70,7 @@ export interface TechnicalAuditReport {
     hasJsonLd: boolean;
     schemaTypes: string[];
     details: string;
+    deliveryMethod?: "static" | "dynamic_rsc" | "dynamic_js" | "none";
   };
   headings: {
     h1Count: number;

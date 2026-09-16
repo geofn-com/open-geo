@@ -50,6 +50,14 @@ export async function auditEntityConsistency(
     }
   });
 
+  // Heuristic fallback: extract brand from RSC / inline schema payload if present
+  if (!schemaBrand && /schema\.org/i.test(html)) {
+    const orgNameMatch = html.match(/@type[\"\\]*:\s*[\"\\]*Organization[\"\\]*.*?[\"\\]*name[\"\\]*:\s*[\"\\]*([^\"\\,]+)[\"\\]*/i);
+    if (orgNameMatch && orgNameMatch[1]) {
+      schemaBrand = orgNameMatch[1].trim();
+    }
+  }
+
   const canonicalBrand = providedBrand || schemaBrand || title.split(/[-|:]/)[0]?.trim() || domainBase;
   const canonicalClean = cleanToken(canonicalBrand);
 

@@ -34,7 +34,7 @@ export async function auditWebpage(rawTargetUrl: string): Promise<TechnicalAudit
       timestamp: new Date().toISOString(),
       score: 0,
       llmsTxt: { hasLlmsTxt: false, hasLlmsFullTxt: false, details: "Webpage inaccessible" },
-      schemaMarkup: { hasJsonLd: false, schemaTypes: [], details: "Webpage inaccessible" },
+      schemaMarkup: { hasJsonLd: false, schemaTypes: [], details: "Webpage inaccessible", deliveryMethod: "none" },
       headings: { h1Count: 0, h2Count: 0, hierarchyValid: false },
       meta: { openGraph: {} },
       aiCrawlability: { allowsAiBots: false, robotsTxtStatus: "Failed", blockedBots: [] },
@@ -96,10 +96,50 @@ export async function auditWebpage(rawTargetUrl: string): Promise<TechnicalAudit
     }
   });
 
-  const hasJsonLd = schemaTypes.length > 0;
-  if (!hasJsonLd) {
-    score -= 20;
-    recommendations.push("No Schema.org JSON-LD detected (Organization, Product, FAQPage). Strongly recommended for LLM knowledge graph grounding.");
+  let hasJsonLd = schemaTypes.length > 0;
+  let deliveryMethod: "static" | "dynamic_rsc" | "dynamic_js" | "none" = hasJsonLd ? "static" : "none";
+  let schemaDetails = "";
+
+  if (hasJsonLd) {
+    schemaDetails = `✅ Detected Schema types (Static HTML): ${schemaTypes.join(", ")}`;
+  } else {
+    // Heuristic detection: check for Next.js RSC streaming payloads or inline script payloads containing schema.org
+    const isRscStream = /__next_f|self\.__next_f|_rsc=/i.test(html);
+    const hasSchemaOrgMarker = /schema\.org/i.test(html);
+
+    if (hasSchemaOrgMarker) {
+      const typeRegex = /@type[\"\\]*:\s*[\"\\]*([A-Za-z0-9_]+)/g;
+      const detectedTypes = new Set<string>();
+      let match;
+      while ((match = typeRegex.exec(html)) !== null) {
+        const t = match[1];
+        if (t && !["null", "undefined", "true", "false", "string", "number", "boolean"].includes(t.toLowerCase())) {
+          detectedTypes.add(t);
+        }
+      }
+
+      if (detectedTypes.size > 0) {
+        hasJsonLd = true;
+        deliveryMethod = isRscStream ? "dynamic_rsc" : "dynamic_js";
+        schemaTypes.push(...Array.from(detectedTypes));
+        // Minor penalty (-5 instead of -20) due to dynamic execution risk for non-JS AI crawlers
+        score -= 5;
+        const frameworkName = isRscStream ? "Next.js RSC stream payload" : "dynamic client script";
+        schemaDetails = `⚠️ Detected in ${frameworkName}: ${schemaTypes.join(", ")} (AI Crawler Risk: non-JS bots may not execute dynamic streams)`;
+        recommendations.push(
+          `⚠️ Schema.org is embedded in dynamic ${frameworkName} rather than root <script type="application/ld+json">. Major AI search crawlers (GPTBot, PerplexityBot) do not execute JavaScript; render JSON-LD statically in root layout to guarantee indexing.`
+        );
+      }
+    }
+
+    if (!hasJsonLd) {
+      deliveryMethod = "none";
+      score -= 20;
+      schemaDetails = "❌ Missing JSON-LD structured data";
+      recommendations.push(
+        "No Schema.org JSON-LD detected (Organization, Product, FAQPage). Strongly recommended for LLM knowledge graph grounding."
+      );
+    }
   }
 
   // 5. Check llms.txt & llms-full (.txt or .md) at root
@@ -177,7 +217,8 @@ export async function auditWebpage(rawTargetUrl: string): Promise<TechnicalAudit
     schemaMarkup: {
       hasJsonLd,
       schemaTypes,
-      details: hasJsonLd ? `✅ Detected Schema types: ${schemaTypes.join(", ")}` : "❌ Missing JSON-LD structured data",
+      details: schemaDetails,
+      deliveryMethod,
     },
     headings: {
       h1Count,

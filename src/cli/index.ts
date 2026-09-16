@@ -55,8 +55,17 @@ program
 
       console.log("\n" + chalk.bold.green("📋 Audit Summary:"));
       console.log(chalk.white(`• Health Score: `) + chalk.bold.yellow(`${auditResult.score} / 100`));
-      console.log(chalk.white(`• llms.txt Standard: `) + (auditResult.llmsTxt.hasLlmsTxt ? chalk.green("Deployed") : chalk.red("Missing")));
-      console.log(chalk.white(`• JSON-LD Structured Data: `) + (auditResult.schemaMarkup.hasJsonLd ? chalk.green("Configured") : chalk.yellow("Missing")));
+      let schemaStatus = chalk.red("Missing");
+      if (auditResult.schemaMarkup.hasJsonLd) {
+        if (auditResult.schemaMarkup.deliveryMethod === "dynamic_rsc") {
+          schemaStatus = chalk.yellow("Dynamic RSC (⚠️ AI Crawler Risk)");
+        } else if (auditResult.schemaMarkup.deliveryMethod === "dynamic_js") {
+          schemaStatus = chalk.yellow("Client Script (⚠️ AI Crawler Risk)");
+        } else {
+          schemaStatus = chalk.green("Configured (Static HTML)");
+        }
+      }
+      console.log(chalk.white(`• JSON-LD Structured Data: `) + schemaStatus);
       console.log(chalk.white(`• AI Search Crawler Access: `) + (auditResult.aiCrawlability.allowsAiBots ? chalk.green("Allowed") : chalk.red("Blocked")));
 
       if (auditResult.recommendations.length > 0) {
