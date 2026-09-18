@@ -10,6 +10,16 @@
 
 ---
 
+<p align="center">
+  <img src="assets/terminal-preview.svg" alt="open-geo CLI terminal preview" width="850" />
+</p>
+
+<p align="center">
+  <sub>🖥️ <em>Runs 100% locally with zero data uploaded. Prefer a visual browser playground? Check out the <a href="https://geofn.com/#demo"><b>Interactive Live Demo →</b></a></em></sub>
+</p>
+
+---
+
 ## ⚡ Quick Start (No Installation Required)
 
 Audit any website in seconds directly via `npx`:

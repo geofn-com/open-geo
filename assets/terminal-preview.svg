@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 570" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16" />
+      <stop offset="50%" stop-color="#0d1117" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+    <linearGradient id="card-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#161b22" />
+      <stop offset="100%" stop-color="#0d1117" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.65" />
+    </filter>
+  </defs>
+
+  <style>
+    .font-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+    .font-sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .title { font-size: 13px; fill: #8b949e; font-weight: 500; }
+    .cmd-prompt { font-size: 15px; fill: #10b981; font-weight: bold; }
+    .cmd-text { font-size: 15px; fill: #f0f6fc; font-weight: 600; }
+    .log-dim { font-size: 13px; fill: #8b949e; }
+    .log-bright { font-size: 13px; fill: #e6edf3; }
+    .log-success { font-size: 13px; fill: #34d399; font-weight: bold; }
+    .log-cyan { font-size: 13px; fill: #38bdf8; font-weight: 600; }
+    .log-yellow { font-size: 13px; fill: #fbbf24; }
+  </style>
+
+  <!-- Background Canvas -->
+  <rect width="920" height="570" fill="transparent" />
+
+  <!-- Main Terminal Window Container -->
+  <g transform="translate(20, 20)" filter="url(#shadow)">
+    <!-- Window Border & Body -->
+    <rect width="880" height="530" rx="12" fill="url(#bg-grad)" stroke="#30363d" stroke-width="1.2" />
+
+    <!-- Window Header -->
+    <path d="M 0,12 C 0,5.37 5.37,0 12,0 L 868,0 C 874.63,0 880,5.37 880,12 L 880,44 L 0,44 Z" fill="#161b22" stroke="#30363d" stroke-width="1" />
+    <line x1="0" y1="44" x2="880" y2="44" stroke="#30363d" stroke-width="1" />
+
+    <!-- Window Controls (Mac Style) -->
+    <circle cx="24" cy="22" r="6" fill="#ff5f56" />
+    <circle cx="44" cy="22" r="6" fill="#ffbd2e" />
+    <circle cx="64" cy="22" r="6" fill="#27c93f" />
+
+    <!-- Window Title -->
+    <text x="440" y="27" text-anchor="middle" class="font-mono title">open-geo-cli — audit geofn.com</text>
+
+    <!-- Quick Mode Badge -->
+    <g transform="translate(730, 11)">
+      <rect width="130" height="22" rx="5" fill="#21262d" stroke="#363b42" stroke-width="0.8" />
+      <text x="65" y="15" text-anchor="middle" class="font-mono" font-size="11" fill="#c9d1d9">Local Heuristic</text>
+    </g>
+
+    <!-- Terminal Content Area -->
+    <g transform="translate(28, 66)" class="font-mono">
+      <!-- Command Prompt -->
+      <text x="0" y="16">
+        <tspan class="cmd-prompt">$ </tspan>
+        <tspan class="cmd-text">npx open-geo audit </tspan>
+        <tspan class="log-cyan">geofn.com</tspan>
+      </text>
+
+      <!-- Step 1: Initial Crawl -->
+      <text x="0" y="46" class="log-dim">
+        <tspan class="log-cyan">🛠️ </tspan>
+        <tspan class="log-bright">Auditing target webpage: </tspan>
+        <tspan class="log-yellow">https://geofn.com</tspan>
+      </text>
+
+      <!-- Step 2: Inspection Progress -->
+      <text x="0" y="70" class="log-dim">
+        <tspan class="log-success">✔ </tspan>
+        <tspan>Robots.txt fetched &amp; parsed (AI bot crawler policies)</tspan>
+      </text>
+      <text x="0" y="94" class="log-dim">
+        <tspan class="log-success">✔ </tspan>
+        <tspan>llms.txt specification verified (/llms.txt &amp; /llms-full.md)</tspan>
+      </text>
+      <text x="0" y="118" class="log-dim">
+        <tspan class="log-success">✔ </tspan>
+        <tspan>Schema.org JSON-LD structured entities extracted</tspan>
+      </text>
+      <text x="0" y="142" class="log-dim">
+        <tspan class="log-success">✔ </tspan>
+        <tspan>Search heading hierarchy &amp; content semantics evaluated</tspan>
+      </text>
+
+      <!-- Audit Report Card Box -->
+      <g transform="translate(0, 166)">
+        <rect width="824" height="180" rx="8" fill="url(#card-grad)" stroke="#238636" stroke-width="1" />
+        
+        <!-- Report Header -->
+        <text x="20" y="30" font-size="14" font-weight="bold" fill="#38bdf8">📋 Technical GEO Audit Summary</text>
+        <g transform="translate(680, 15)">
+          <rect width="124" height="26" rx="13" fill="#13231b" stroke="#238636" stroke-width="1" />
+          <text x="62" y="18" text-anchor="middle" font-size="12" font-weight="bold" fill="#34d399">SCORE 100/100</text>
+        </g>
+
+        <!-- Metric Rows -->
+        <g transform="translate(20, 52)" font-size="13">
+          <!-- Row 1 -->
+          <text x="0" y="20">
+            <tspan fill="#8b949e">• Robots AI Bot Policy:</tspan>
+            <tspan x="260" fill="#34d399" font-weight="bold">ALLOWED </tspan>
+            <tspan fill="#8b949e">(GPTBot, ClaudeBot, PerplexityBot, Google-Extended)</tspan>
+          </text>
+
+          <!-- Row 2 -->
+          <text x="0" y="46">
+            <tspan fill="#8b949e">• llms.txt Specification:</tspan>
+            <tspan x="260" fill="#34d399" font-weight="bold">PRESENT </tspan>
+            <tspan fill="#8b949e">(/llms.txt valid markdown format)</tspan>
+          </text>
+
+          <!-- Row 3 -->
+          <text x="0" y="72">
+            <tspan fill="#8b949e">• Structured Data (JSON-LD):</tspan>
+            <tspan x="260" fill="#34d399" font-weight="bold">CONFIGURED </tspan>
+            <tspan fill="#8b949e">(Organization, WebSite, SoftwareApplication)</tspan>
+          </text>
+
+          <!-- Row 4 -->
+          <text x="0" y="98">
+            <tspan fill="#8b949e">• Semantic Heading Flow:</tspan>
+            <tspan x="260" fill="#34d399" font-weight="bold">OPTIMAL </tspan>
+            <tspan fill="#8b949e">(Clean H1-H3 hierarchy with zero nesting gaps)</tspan>
+          </text>
+        </g>
+      </g>
+
+      <!-- Terminal Ready Cursor (Spacious & Cleanly Displayed) -->
+      <g transform="translate(0, 376)">
+        <text x="0" y="16">
+          <tspan class="cmd-prompt">$ </tspan>
+          <tspan fill="#e6edf3">open-geo probe "yourbrand" -d geofn.com</tspan>
+        </text>
+        <!-- Blinking green cursor with accurate offset -->
+        <rect x="368" y="3" width="8" height="15" fill="#10b981">
+          <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite" />
+        </rect>
+      </g>
+    </g>
+
+    <!-- Terminal Footer Status Bar -->
+    <path d="M 0,494 L 880,494 L 880,518 C 880,524.63 874.63,530 868,530 L 12,530 C 5.37,530 0,524.63 0,518 Z" fill="#0d1117" stroke="#30363d" stroke-width="1" />
+    <line x1="0" y1="494" x2="880" y2="494" stroke="#30363d" stroke-width="1" />
+    <g transform="translate(24, 515)" class="font-mono" font-size="11" fill="#8b949e">
+      <text x="0" y="0">⚡ 100% Self-Hosted &amp; Zero Telemetry</text>
+      <text x="440" y="0" text-anchor="middle">Ready for CI/CD Pipeline &amp; Cursor / Claude Code MCP</text>
+      <text x="830" y="0" text-anchor="end">MIT License</text>
+    </g>
+  </g>
+</svg>

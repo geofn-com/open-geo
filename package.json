@@ -1,6 +1,6 @@
 {
   "name": "open-geo",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Open-source, AI-Native Generative Engine Optimization (GEO) & Technical Audit CLI",
   "type": "module",
   "bin": {
@@ -10,6 +10,7 @@
   "main": "./dist/index.js",
   "files": [
     "dist",
+    "assets",
     "README.md",
     "LICENSE",
     ".env.example"
