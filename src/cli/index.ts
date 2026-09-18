@@ -15,6 +15,7 @@ import { formatGeoMarkdownReport, formatAuditMarkdownReport, formatFanoutMarkdow
 import { startMcpServer } from "../mcp/server.js";
 import { VERSION } from "../lib/version.js";
 import { normalizeUrl } from "../lib/url.js";
+import { safeAtomicWrite, FileExistsError } from "../lib/fs-atomic.js";
 
 const program = new Command();
 
@@ -39,6 +40,7 @@ program
   .description("Perform zero-dependency technical GEO & AI crawlability audit on a target webpage")
   .argument("<url>", "Target webpage URL (e.g. 'https://example.com')")
   .option("-o, --output <path>", "Report markdown output file path")
+  .option("-f, --force", "Force overwrite output file if it already exists", false)
   .action(async (url, options) => {
     console.log(chalk.bold.cyan(`\n🛠️ Auditing target webpage: ${chalk.yellow(url)}`));
     const spinner = ora("Analyzing HTML structure, Schema.org, llms.txt, and AI crawler rules...").start();
@@ -49,7 +51,7 @@ program
 
       const reportMarkdown = formatAuditMarkdownReport(auditResult);
       if (options.output) {
-        await fs.writeFile(options.output, reportMarkdown, "utf-8");
+        await safeAtomicWrite(options.output, reportMarkdown, { force: options.force });
         console.log(chalk.gray(`\n📄 Audit report saved to: `) + chalk.underline.blue(path.resolve(options.output)));
       }
 
@@ -89,6 +91,7 @@ program
   .argument("<url>", "Target website homepage URL (e.g. 'https://example.com')")
   .option("-o, --output <path>", "Output directory or file path (default: ./llms.txt)", "./llms.txt")
   .option("--full", "Also generate comprehensive llms-full.md documentation", false)
+  .option("-f, --force", "Force overwrite output file if it already exists", false)
   .action(async (url, options) => {
     console.log(chalk.bold.cyan(`\n📑 Generating llms.txt for website: ${chalk.yellow(url)}`));
     const spinner = ora("Crawling site architecture and core page summaries...").start();
@@ -101,12 +104,12 @@ program
 
       spinner.succeed(chalk.green(`Successfully indexed ${result.pagesIncluded} pages and generated standards!`));
 
-      await fs.writeFile(options.output, result.llmsTxt, "utf-8");
+      await safeAtomicWrite(options.output, result.llmsTxt, { force: options.force });
       console.log(chalk.gray(`\n📄 llms.txt saved to: `) + chalk.underline.blue(path.resolve(options.output)));
 
       if (options.full && result.llmsFullMd) {
         const fullPath = options.output.replace(/llms\.txt$/i, "llms-full.md");
-        await fs.writeFile(fullPath, result.llmsFullMd, "utf-8");
+        await safeAtomicWrite(fullPath, result.llmsFullMd, { force: options.force });
         console.log(chalk.gray(`📄 llms-full.md saved to: `) + chalk.underline.blue(path.resolve(fullPath)));
       }
 
@@ -124,6 +127,7 @@ program
   .argument("<urlOrText>", "Webpage URL or raw text content")
   .option("-o, --output <path>", "Output Markdown file path")
   .option("-c, --count <count>", "Number of FAQ items to generate", "6")
+  .option("-f, --force", "Force overwrite output file if it already exists", false)
   .action(async (urlOrText, options) => {
     console.log(chalk.bold.cyan(`\n❓ Generating high-value FAQs and JSON-LD Schema...`));
     const spinner = ora("Extracting core questions and synthesizing structured data...").start();
@@ -141,7 +145,7 @@ program
       const fullOutput = `${result.markdown}\n\n## 🏷️ Schema.org FAQPage JSON-LD\n\`\`\`html\n${result.jsonLdSchema}\n\`\`\``;
 
       if (options.output) {
-        await fs.writeFile(options.output, fullOutput, "utf-8");
+        await safeAtomicWrite(options.output, fullOutput, { force: options.force });
         console.log(chalk.gray(`\n📄 FAQ report saved to: `) + chalk.underline.blue(path.resolve(options.output)));
       } else {
         console.log("\n" + fullOutput);
@@ -193,6 +197,7 @@ program
   .option("-d, --domain <domain>", "Target brand domain")
   .option("-i, --industry <industry>", "Industry category or vertical")
   .option("-o, --output <path>", "Report output file path")
+  .option("-f, --force", "Force overwrite output file if it already exists", false)
   .action(async (topic, options) => {
     console.log(chalk.bold.cyan(`\n🌐 Performing Query Fan-out intent analysis: ${chalk.yellow(topic)}`));
     const spinner = ora("Decomposing 5-dimensional intents and verifying search signals...").start();
@@ -208,7 +213,7 @@ program
 
       if (options.output) {
         const reportMarkdown = formatFanoutMarkdownReport(fanoutResult);
-        await fs.writeFile(options.output, reportMarkdown, "utf-8");
+        await safeAtomicWrite(options.output, reportMarkdown, { force: options.force });
         console.log(chalk.gray(`\n📄 Analysis report saved to: `) + chalk.underline.blue(path.resolve(options.output)));
       }
 
@@ -237,6 +242,7 @@ program
   .option("-i, --industry <industry>", "Industry vertical classification")
   .option("-m, --model <model>", "LLM model to probe (auto-detected from .env if omitted)")
   .option("-o, --output <path>", "Report output file path (default: ./geo-report.md)")
+  .option("-f, --force", "Force overwrite output file if it already exists", false)
   .action(async (brand, options) => {
     let targetBrand = brand.trim();
     let targetDomain = options.domain?.trim();
@@ -265,7 +271,7 @@ program
 
       const reportMarkdown = formatGeoMarkdownReport(scorecard);
       const outputPath = options.output || "./geo-report.md";
-      await fs.writeFile(outputPath, reportMarkdown, "utf-8");
+      await safeAtomicWrite(outputPath, reportMarkdown, { force: options.force });
 
       const isSimulated = scorecard.results.some((r) => r.isSimulated);
       if (isSimulated) {
