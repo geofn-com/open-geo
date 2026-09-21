@@ -21,6 +21,171 @@ import { diagnoseGeoFailures } from "../analyzers/failure-triage.js";
 import { VERSION } from "../lib/version.js";
 import { normalizeUrl } from "../lib/url.js";
 
+export interface McpToolAnnotation {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+}
+
+export interface McpToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  annotations: McpToolAnnotation;
+}
+
+export const COMMUNITY_MCP_TOOLS: McpToolDefinition[] = [
+        {
+          name: "geo_diagnose_failure",
+          description:
+            "Diagnose root-cause GEO failures (AI crawler blockades, missing discovery standards, entity fragmentation) and generate actionable code patches (robots.txt, JSON-LD, llms.txt)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              url: { type: "string", description: "Target website homepage or landing page URL to diagnose" },
+              brand: { type: "string", description: "Target brand name (optional)" },
+            },
+            required: ["url"],
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+          },
+        },
+        {
+          name: "geo_audit_webpage",
+          description:
+            "Comprehensive technical readiness audit for HTML structure, Schema.org, llms.txt, and AI crawler whitelisting",
+          inputSchema: {
+            type: "object",
+            properties: {
+              url: { type: "string", description: "Target webpage URL to audit" },
+            },
+            required: ["url"],
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+          },
+        },
+        {
+          name: "geo_generate_llms",
+          description:
+            "Crawl site navigation and generate standard /llms.txt and structured Markdown documentation for LLM RAG agents",
+          inputSchema: {
+            type: "object",
+            properties: {
+              url: { type: "string", description: "Target website homepage URL" },
+              full: { type: "boolean", description: "Whether to also generate llms-full.md (default false)" },
+            },
+            required: ["url"],
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+          },
+        },
+        {
+          name: "geo_generate_faq",
+          description:
+            "Extract core Q&As and generate Schema.org FAQPage JSON-LD structured data from URL or raw text",
+          inputSchema: {
+            type: "object",
+            properties: {
+              urlOrText: { type: "string", description: "Webpage URL or raw text content" },
+              count: { type: "number", description: "Number of FAQ items to generate (default 6)" },
+            },
+            required: ["urlOrText"],
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+          },
+        },
+        {
+          name: "geo_retrieval_quality",
+          description:
+            "Audit page Text-to-HTML ratio, client-side rendering (CSR) risk, and Canonical tag compliance for static AI crawlers",
+          inputSchema: {
+            type: "object",
+            properties: {
+              url: { type: "string", description: "Target webpage URL to audit" },
+            },
+            required: ["url"],
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+          },
+        },
+        {
+          name: "geo_content_freshness",
+          description:
+            "Audit page publishing date, modification timestamp, Schema.org dateModified, and copyright year freshness signals",
+          inputSchema: {
+            type: "object",
+            properties: {
+              url: { type: "string", description: "Target webpage URL to audit" },
+            },
+            required: ["url"],
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+          },
+        },
+        {
+          name: "geo_simulate_score",
+          description:
+            "Zero-token local heuristic estimation of GEO score synthesizing discovery stack, robots accessibility, citability, and entity consistency",
+          inputSchema: {
+            type: "object",
+            properties: {
+              url: { type: "string", description: "Target webpage URL to evaluate" },
+              brand: { type: "string", description: "Brand name (optional)" },
+            },
+            required: ["url"],
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+          },
+        },
+        {
+          name: "geo_suggest_keywords",
+          description:
+            "Mine real-time Google & Bing search suggestions and intent stages (ToFU/MoFU/BoFU)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              seed: { type: "string", description: "Seed keyword or topic" },
+            },
+            required: ["seed"],
+          },
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+          },
+        },
+      ];
+
 /**
  * Starts the OpenGEO native MCP Server over stdio (Community Edition)
  */
@@ -40,108 +205,7 @@ export async function startMcpServer() {
   // Community MCP Tools
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
-      tools: [
-        {
-          name: "geo_diagnose_failure",
-          description:
-            "Diagnose root-cause GEO failures (AI crawler blockades, missing discovery standards, entity fragmentation) and generate actionable code patches (robots.txt, JSON-LD, llms.txt)",
-          inputSchema: {
-            type: "object",
-            properties: {
-              url: { type: "string", description: "Target website homepage or landing page URL to diagnose" },
-              brand: { type: "string", description: "Target brand name (optional)" },
-            },
-            required: ["url"],
-          },
-        },
-        {
-          name: "geo_audit_webpage",
-          description:
-            "Comprehensive technical readiness audit for HTML structure, Schema.org, llms.txt, and AI crawler whitelisting",
-          inputSchema: {
-            type: "object",
-            properties: {
-              url: { type: "string", description: "Target webpage URL to audit" },
-            },
-            required: ["url"],
-          },
-        },
-        {
-          name: "geo_generate_llms",
-          description:
-            "Crawl site navigation and generate standard /llms.txt and structured Markdown documentation for LLM RAG agents",
-          inputSchema: {
-            type: "object",
-            properties: {
-              url: { type: "string", description: "Target website homepage URL" },
-              full: { type: "boolean", description: "Whether to also generate llms-full.md (default false)" },
-            },
-            required: ["url"],
-          },
-        },
-        {
-          name: "geo_generate_faq",
-          description:
-            "Extract core Q&As and generate Schema.org FAQPage JSON-LD structured data from URL or raw text",
-          inputSchema: {
-            type: "object",
-            properties: {
-              urlOrText: { type: "string", description: "Webpage URL or raw text content" },
-              count: { type: "number", description: "Number of FAQ items to generate (default 6)" },
-            },
-            required: ["urlOrText"],
-          },
-        },
-        {
-          name: "geo_retrieval_quality",
-          description:
-            "Audit page Text-to-HTML ratio, client-side rendering (CSR) risk, and Canonical tag compliance for static AI crawlers",
-          inputSchema: {
-            type: "object",
-            properties: {
-              url: { type: "string", description: "Target webpage URL to audit" },
-            },
-            required: ["url"],
-          },
-        },
-        {
-          name: "geo_content_freshness",
-          description:
-            "Audit page publishing date, modification timestamp, Schema.org dateModified, and copyright year freshness signals",
-          inputSchema: {
-            type: "object",
-            properties: {
-              url: { type: "string", description: "Target webpage URL to audit" },
-            },
-            required: ["url"],
-          },
-        },
-        {
-          name: "geo_simulate_score",
-          description:
-            "Zero-token local heuristic estimation of GEO score synthesizing discovery stack, robots accessibility, citability, and entity consistency",
-          inputSchema: {
-            type: "object",
-            properties: {
-              url: { type: "string", description: "Target webpage URL to evaluate" },
-              brand: { type: "string", description: "Brand name (optional)" },
-            },
-            required: ["url"],
-          },
-        },
-        {
-          name: "geo_suggest_keywords",
-          description:
-            "Mine real-time Google & Bing search suggestions and intent stages (ToFU/MoFU/BoFU)",
-          inputSchema: {
-            type: "object",
-            properties: {
-              seed: { type: "string", description: "Seed keyword or topic" },
-            },
-            required: ["seed"],
-          },
-        },
-      ],
+      tools: COMMUNITY_MCP_TOOLS,
     };
   });
 
