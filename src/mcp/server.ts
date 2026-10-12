@@ -20,6 +20,9 @@ import { generateFullSchema } from "../analyzers/schema-generator.js";
 import { diagnoseGeoFailures } from "../analyzers/failure-triage.js";
 import { VERSION } from "../lib/version.js";
 import { normalizeUrl } from "../lib/url.js";
+import { z } from "zod";
+import { PublicUrlSchema, validatePublicUrl } from "../lib/security.js";
+import { sanitizeError } from "../lib/sanitize.js";
 
 export interface McpToolAnnotation {
   readOnlyHint: boolean;
@@ -209,15 +212,63 @@ export async function startMcpServer() {
     };
   });
 
+  // Input Validation Schemas for Community MCP Tools
+  const DiagnoseSchema = z.object({
+    url: PublicUrlSchema,
+    brand: z.string().optional(),
+  });
+
+  const AuditSchema = z.object({
+    url: PublicUrlSchema,
+  });
+
+  const GenerateLlmsSchema = z.object({
+    url: PublicUrlSchema,
+    full: z.boolean().optional(),
+  });
+
+  const GenerateFaqSchema = z.object({
+    urlOrText: z.string().min(1, "Target urlOrText must not be empty"),
+    count: z.coerce.number().int().min(1).max(20).default(6),
+  });
+
+  const RetrievalQualitySchema = z.object({
+    url: PublicUrlSchema,
+  });
+
+  const FreshnessSchema = z.object({
+    url: PublicUrlSchema,
+  });
+
+  const SimulateScoreSchema = z.object({
+    url: PublicUrlSchema,
+    brand: z.string().optional(),
+  });
+
+  const SuggestKeywordsSchema = z.object({
+    seed: z.string().min(1, "Seed keyword or topic must not be empty"),
+  });
+
+  function formatSchemaError(error: z.ZodError): string {
+    return error.issues.map((i) => i.message).join("; ");
+  }
+
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
     try {
       switch (name) {
         case "geo_diagnose_failure": {
+          const parsed = DiagnoseSchema.safeParse(args);
+          if (!parsed.success) {
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Invalid input: ${formatSchemaError(parsed.error)}` }],
+            };
+          }
           const res = await diagnoseGeoFailures({
-            url: String(args?.url),
-            brand: args?.brand ? String(args.brand) : undefined,
+            url: parsed.data.url,
+            brand: parsed.data.brand,
           });
           const output = {
             ...res,
@@ -227,7 +278,14 @@ export async function startMcpServer() {
         }
 
         case "geo_audit_webpage": {
-          const res = await auditWebpage(String(args?.url));
+          const parsed = AuditSchema.safeParse(args);
+          if (!parsed.success) {
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Invalid input: ${formatSchemaError(parsed.error)}` }],
+            };
+          }
+          const res = await auditWebpage(parsed.data.url);
           const output = {
             ...res,
             _commercialNotice: "💡 Tip: Single-page audit complete. For full-site automated crawling and dynamic property drift alerts, visit https://geofn.com",
@@ -236,38 +294,86 @@ export async function startMcpServer() {
         }
 
         case "geo_generate_llms": {
+          const parsed = GenerateLlmsSchema.safeParse(args);
+          if (!parsed.success) {
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Invalid input: ${formatSchemaError(parsed.error)}` }],
+            };
+          }
           const res = await generateLlmsTxt({
-            url: String(args?.url),
-            includeFull: Boolean(args?.full),
+            url: parsed.data.url,
+            includeFull: Boolean(parsed.data.full),
           });
           return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
         }
 
         case "geo_generate_faq": {
-          const input = String(args?.urlOrText).trim();
+          const parsed = GenerateFaqSchema.safeParse(args);
+          if (!parsed.success) {
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Invalid input: ${formatSchemaError(parsed.error)}` }],
+            };
+          }
+          const input = parsed.data.urlOrText.trim();
           const isUrl = /^https?:\/\//i.test(input) || (!input.includes(" ") && input.includes("."));
+          let validatedUrl: string | undefined = undefined;
+
+          if (isUrl) {
+            const urlCheck = validatePublicUrl(input);
+            if (!urlCheck.isValid) {
+              return {
+                isError: true,
+                content: [{ type: "text", text: `Invalid URL: ${urlCheck.error}` }],
+              };
+            }
+            validatedUrl = urlCheck.normalizedUrl;
+          }
+
           const res = await generateFaq({
-            url: isUrl ? normalizeUrl(input) : undefined,
+            url: validatedUrl,
             text: isUrl ? undefined : input,
-            count: args?.count ? Number(args.count) : 6,
+            count: parsed.data.count,
           });
           return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
         }
 
         case "geo_retrieval_quality": {
-          const res = await auditRetrievalQuality(String(args?.url));
+          const parsed = RetrievalQualitySchema.safeParse(args);
+          if (!parsed.success) {
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Invalid input: ${formatSchemaError(parsed.error)}` }],
+            };
+          }
+          const res = await auditRetrievalQuality(parsed.data.url);
           return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
         }
 
         case "geo_content_freshness": {
-          const res = await auditContentFreshness(String(args?.url));
+          const parsed = FreshnessSchema.safeParse(args);
+          if (!parsed.success) {
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Invalid input: ${formatSchemaError(parsed.error)}` }],
+            };
+          }
+          const res = await auditContentFreshness(parsed.data.url);
           return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
         }
 
         case "geo_simulate_score": {
+          const parsed = SimulateScoreSchema.safeParse(args);
+          if (!parsed.success) {
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Invalid input: ${formatSchemaError(parsed.error)}` }],
+            };
+          }
           const res = await simulateGeoScore(
-            String(args?.url),
-            args?.brand ? String(args.brand) : undefined
+            parsed.data.url,
+            parsed.data.brand
           );
           const output = {
             ...res,
@@ -277,7 +383,14 @@ export async function startMcpServer() {
         }
 
         case "geo_suggest_keywords": {
-          const res = await getUnifiedSuggestions([String(args?.seed)]);
+          const parsed = SuggestKeywordsSchema.safeParse(args);
+          if (!parsed.success) {
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Invalid input: ${formatSchemaError(parsed.error)}` }],
+            };
+          }
+          const res = await getUnifiedSuggestions([parsed.data.seed]);
           return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
         }
 
@@ -287,7 +400,7 @@ export async function startMcpServer() {
     } catch (err: any) {
       return {
         isError: true,
-        content: [{ type: "text", text: `Tool error: ${err.message}` }],
+        content: [{ type: "text", text: `Tool error: ${sanitizeError(err)}` }],
       };
     }
   });

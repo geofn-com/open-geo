@@ -1,34 +1,28 @@
 import * as cheerio from "cheerio";
 import type { TechnicalAuditReport } from "../types/index.js";
-import { checkBotAllowedInRobots } from "../analyzers/robots.js";
-import { USER_AGENT as DEFAULT_USER_AGENT } from "../lib/version.js";
+import { checkBotAllowedInRobots, CRITICAL_SEARCH_BOTS, MIXED_TRAINING_BOTS } from "../analyzers/robots.js";
 import { normalizeUrl } from "../lib/url.js";
+import { safeFetchText } from "../lib/http.js";
 
 /**
  * Perform deep local semantic & technical audit of a webpage for GEO readiness
  */
 export async function auditWebpage(rawTargetUrl: string): Promise<TechnicalAuditReport> {
   const targetUrl = normalizeUrl(rawTargetUrl);
-  const parsedUrl = new URL(targetUrl);
-  const origin = parsedUrl.origin;
+  let origin = "";
+  try {
+    const parsedUrl = new URL(targetUrl);
+    origin = parsedUrl.origin;
+  } catch {
+    origin = targetUrl;
+  }
 
   const recommendations: string[] = [];
   let score = 100;
 
-  // 1. Fetch HTML page with 10s timeout
-  let html = "";
-  try {
-    const res = await fetch(targetUrl, {
-      headers: {
-        "User-Agent": DEFAULT_USER_AGENT,
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    }
-    html = await res.text();
-  } catch (err: any) {
+  // 1. Fetch HTML page with 10s timeout using safeFetchText
+  const htmlFetch = await safeFetchText(targetUrl, { timeoutMs: 10000 });
+  if (!htmlFetch.ok || !htmlFetch.text) {
     return {
       url: targetUrl,
       timestamp: new Date().toISOString(),
@@ -38,9 +32,11 @@ export async function auditWebpage(rawTargetUrl: string): Promise<TechnicalAudit
       headings: { h1Count: 0, h2Count: 0, hierarchyValid: false },
       meta: { openGraph: {} },
       aiCrawlability: { allowsAiBots: false, robotsTxtStatus: "Failed", blockedBots: [] },
-      recommendations: [`Failed to fetch webpage: ${err.message}`],
+      recommendations: [`Failed to fetch webpage: ${htmlFetch.error || "Webpage inaccessible"}`],
     };
   }
+
+  const html = htmlFetch.text;
 
   const $ = cheerio.load(html);
 
@@ -146,23 +142,14 @@ export async function auditWebpage(rawTargetUrl: string): Promise<TechnicalAudit
   let hasLlmsTxt = false;
   let hasLlmsFullTxt = false;
   try {
-    const llmsRes = await fetch(`${origin}/llms.txt`, {
-      headers: { "User-Agent": DEFAULT_USER_AGENT },
-      signal: AbortSignal.timeout(6000),
-    });
+    const llmsRes = await safeFetchText(`${origin}/llms.txt`, { timeoutMs: 6000 });
     hasLlmsTxt = llmsRes.ok;
 
     const [llmsFullTxtRes, llmsFullMdRes] = await Promise.all([
-      fetch(`${origin}/llms-full.txt`, {
-        headers: { "User-Agent": DEFAULT_USER_AGENT },
-        signal: AbortSignal.timeout(6000),
-      }).catch(() => null),
-      fetch(`${origin}/llms-full.md`, {
-        headers: { "User-Agent": DEFAULT_USER_AGENT },
-        signal: AbortSignal.timeout(6000),
-      }).catch(() => null),
+      safeFetchText(`${origin}/llms-full.txt`, { timeoutMs: 6000 }),
+      safeFetchText(`${origin}/llms-full.md`, { timeoutMs: 6000 }),
     ]);
-    hasLlmsFullTxt = Boolean(llmsFullTxtRes?.ok || llmsFullMdRes?.ok);
+    hasLlmsFullTxt = Boolean(llmsFullTxtRes.ok || llmsFullMdRes.ok);
   } catch {
     // ignore
   }
@@ -178,28 +165,42 @@ export async function auditWebpage(rawTargetUrl: string): Promise<TechnicalAudit
   const blockedBots: string[] = [];
   let allowsAiBots = true;
   let robotsTxtStatus = "OK";
-  try {
-    const robotsRes = await fetch(`${origin}/robots.txt`, {
-      headers: { "User-Agent": DEFAULT_USER_AGENT },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (robotsRes.ok) {
-      const robotsText = await robotsRes.text();
-      const aiBots = ["GPTBot", "OAI-SearchBot", "PerplexityBot", "ClaudeBot", "Google-Extended"];
-      for (const bot of aiBots) {
-        const check = checkBotAllowedInRobots(robotsText, bot);
-        if (!check.allowed) {
-          blockedBots.push(bot);
-        }
-      }
-      if (blockedBots.length > 0) {
-        allowsAiBots = false;
-        score -= 20;
-        recommendations.push(`robots.txt blocks critical AI search bots (${blockedBots.join(", ")}), directly preventing LLM grounding citations.`);
+  const robotsRes = await safeFetchText(`${origin}/robots.txt`, { timeoutMs: 6000 });
+  if (robotsRes.ok && robotsRes.text) {
+    const robotsText = robotsRes.text;
+    const blockedSearchBots: string[] = [];
+    const blockedMixedBots: string[] = [];
+
+    for (const bot of CRITICAL_SEARCH_BOTS) {
+      const check = checkBotAllowedInRobots(robotsText, bot);
+      if (!check.allowed) {
+        blockedSearchBots.push(bot);
+        blockedBots.push(bot);
       }
     }
-  } catch {
-    robotsTxtStatus = "Unavailable";
+
+    for (const bot of MIXED_TRAINING_BOTS) {
+      const check = checkBotAllowedInRobots(robotsText, bot);
+      if (!check.allowed) {
+        blockedMixedBots.push(bot);
+        blockedBots.push(bot);
+      }
+    }
+
+    if (blockedSearchBots.length > 0) {
+      allowsAiBots = false;
+      score -= 20;
+      recommendations.push(
+        `robots.txt blocks critical AI search retrieval bots (${blockedSearchBots.join(", ")}), directly preventing real-time LLM grounding and citation.`
+      );
+    } else if (blockedMixedBots.length > 0) {
+      score -= 5;
+      recommendations.push(
+        `robots.txt blocks foundation model training crawlers (${blockedMixedBots.join(", ")}). Live search bots (OAI-SearchBot/PerplexityBot) remain allowed.`
+      );
+    }
+  } else {
+    robotsTxtStatus = robotsRes.error ? "Fetch Error" : "Unavailable";
   }
 
   score = Math.max(0, Math.min(100, score));

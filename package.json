@@ -1,6 +1,6 @@
 {
   "name": "open-geo",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Open-source, AI-Native Generative Engine Optimization (GEO) & Technical Audit CLI",
   "type": "module",
   "bin": {
@@ -39,6 +39,14 @@
     "url": "https://geofn.com"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geofn-com/open-geo.git"
+  },
+  "homepage": "https://geofn.com",
+  "bugs": {
+    "url": "https://github.com/geofn-com/open-geo/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
     "chalk": "^5.4.1",
@@ -46,7 +54,8 @@
     "commander": "^13.1.0",
     "dotenv": "^16.4.7",
     "entities": "^7.0.1",
-    "ora": "^8.2.0"
+    "ora": "^8.2.0",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",

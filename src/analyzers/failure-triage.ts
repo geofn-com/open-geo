@@ -62,10 +62,15 @@ export async function diagnoseGeoFailures(
   const diagnosedItems: FailureDiagnosisItem[] = [];
   const actionableFixes: RemediationPatch[] = [];
 
-  // 1. Check Crawler Blockade (P0 Blocker)
+  // 1. Check Crawler Blockade (P0 Blocker for Search Bots, P2 Advisory for Mixed/Training)
   const blockedSearchBots = robots?.botMatrix
     ? robots.botMatrix
-        .filter((b) => (b.category === "search" || b.category === "mixed") && !b.allowed)
+        .filter((b) => b.category === "search" && !b.allowed)
+        .map((b) => b.botName)
+    : [];
+  const blockedMixedBots = robots?.botMatrix
+    ? robots.botMatrix
+        .filter((b) => b.category === "mixed" && !b.allowed)
         .map((b) => b.botName)
     : [];
   const hasFatalWildcard = Boolean(robots?.fatalPatterns?.allBlockedByWildcard);
@@ -92,6 +97,18 @@ export async function diagnoseGeoFailures(
       impactScore: 95,
       priorityScore: 95, // 5 min fix, catastrophic impact
       patches: [patch],
+    });
+  } else if (blockedMixedBots.length > 0) {
+    diagnosedItems.push({
+      category: "crawler_blocked",
+      categoryLabel: CATEGORY_LABELS.crawler_blocked,
+      severity: "P2_MODERATE",
+      title: "Foundation Training Crawlers Restricted in robots.txt",
+      rootCause: `Your robots.txt blocks foundation model crawlers (${blockedMixedBots.join(", ")}). Note: Search retrieval bots (OAI-SearchBot/PerplexityBot) are allowed, so real-time citations are preserved.`,
+      evidence: [`Restricted foundation crawlers: ${blockedMixedBots.join(", ")}`],
+      impactScore: 40,
+      priorityScore: 50,
+      patches: [],
     });
   }
 

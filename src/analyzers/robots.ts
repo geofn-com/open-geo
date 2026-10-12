@@ -3,6 +3,7 @@ import type {
   RobotsAuditReport,
   AiBotCategory,
 } from "../types/index.js";
+import { safeFetchText } from "../lib/http.js";
 
 export interface BotDefinition {
   botName: string;
@@ -133,6 +134,14 @@ export const AI_BOT_DEFINITIONS: BotDefinition[] = [
   },
 ];
 
+export const CRITICAL_SEARCH_BOTS: string[] = AI_BOT_DEFINITIONS
+  .filter((b) => b.category === "search")
+  .map((b) => b.botName);
+
+export const MIXED_TRAINING_BOTS: string[] = AI_BOT_DEFINITIONS
+  .filter((b) => b.category === "mixed")
+  .map((b) => b.botName);
+
 /**
  * Parses robots.txt content and checks rules for a specific User-Agent
  */
@@ -219,28 +228,25 @@ import { normalizeUrl } from "../lib/url.js";
  */
 export async function auditRobotsTxt(rawTargetUrl: string): Promise<RobotsAuditReport> {
   const targetUrl = normalizeUrl(rawTargetUrl);
-  const urlObj = new URL(targetUrl);
-  const robotsUrl = `${urlObj.origin}/robots.txt`;
+  let robotsUrl = "";
+  try {
+    const urlObj = new URL(targetUrl);
+    robotsUrl = `${urlObj.origin}/robots.txt`;
+  } catch {
+    robotsUrl = `${targetUrl}/robots.txt`;
+  }
 
   let robotsContent = "";
   let contentSignalHeader: string | undefined;
   let robotsTxtFound = false;
+  let fetchError: string | undefined = undefined;
 
-  try {
-    const res = await fetch(robotsUrl, {
-      headers: {
-        "User-Agent": "open-geo-audit/1.0",
-        Accept: "text/plain, */*",
-      },
-    });
-
-    if (res.ok) {
-      robotsContent = await res.text();
-      robotsTxtFound = true;
-      contentSignalHeader = res.headers.get("content-signal") || undefined;
-    }
-  } catch {
-    // If network error, treated as not found
+  const robotsFetch = await safeFetchText(robotsUrl, { timeoutMs: 6000 });
+  if (robotsFetch.ok && robotsFetch.text) {
+    robotsContent = robotsFetch.text;
+    robotsTxtFound = true;
+  } else if (!robotsFetch.ok) {
+    fetchError = robotsFetch.error;
   }
 
   const botMatrix: BotAuditStatus[] = AI_BOT_DEFINITIONS.map((def) => {
@@ -273,11 +279,20 @@ export async function auditRobotsTxt(rawTargetUrl: string): Promise<RobotsAuditR
       ? Math.round((trainingBots.filter((b) => !b.allowed).length / trainingBots.length) * 100)
       : 0;
 
-  // Fatal pattern checks
+  // Fatal pattern checks with line-anchored regex
+  const hasDisallowApi = /^\s*Disallow:\s*\/api(?:\/|\s*$|\*)/im.test(robotsContent);
+  const hasAllowApi = /^\s*Allow:\s*\/api(?:\/|\s*$|\*)/im.test(robotsContent);
+
   const fatalPatterns = {
-    allBlockedByWildcard: robotsContent.includes("User-agent: *\nDisallow: /") || robotsContent.includes("User-agent: *\r\nDisallow: /"),
-    nextJsBundlesBlocked: robotsContent.includes("/_next/") || robotsContent.includes("/_nuxt/"),
-    apiEndpointsBlocked: robotsContent.includes("/api/") && !robotsContent.includes("Allow: /api/"),
+    allBlockedByWildcard:
+      /^\s*User-agent:\s*\*\s*\r?\n\s*Disallow:\s*\/\s*$/im.test(robotsContent) ||
+      robotsContent.includes("User-agent: *\nDisallow: /") ||
+      robotsContent.includes("User-agent: *\r\nDisallow: /"),
+    nextJsBundlesBlocked:
+      /^\s*Disallow:\s*\/(?:_next|_nuxt)\//im.test(robotsContent) ||
+      robotsContent.includes("/_next/") ||
+      robotsContent.includes("/_nuxt/"),
+    apiEndpointsBlocked: hasDisallowApi && !hasAllowApi,
     sitemapMissing: !robotsContent.toLowerCase().includes("sitemap:"),
   };
 
@@ -317,5 +332,6 @@ export async function auditRobotsTxt(rawTargetUrl: string): Promise<RobotsAuditR
     fatalPatterns,
     botMatrix,
     recommendations,
+    fetchError,
   };
 }

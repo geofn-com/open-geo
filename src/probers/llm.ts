@@ -2,6 +2,7 @@ import "../lib/env.js";
 import type { IProber } from "./base.js";
 import { evaluateResponse } from "./base.js";
 import type { ProberResult, SyntheticPrompt } from "../types/index.js";
+import { sanitizeError } from "../lib/sanitize.js";
 
 function sanitizeApiKey(key?: string): string {
   if (!key) return "";
@@ -198,13 +199,14 @@ Evaluation Criteria:
         isSimulated: false,
       };
     } catch (err: any) {
+      const sanitizedMsg = sanitizeError(err, [this.apiKey]);
       return {
         model: this.name,
         promptId: prompt.id,
         promptText: prompt.prompt,
         query: prompt.query || prompt.title,
         stage: prompt.stage,
-        rawResponse: `Error calling model: ${err.message}`,
+        rawResponse: `Error calling model: ${sanitizedMsg}`,
         brandMentioned: false,
         mentionIndex: -1,
         sentiment: "none",
