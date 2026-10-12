@@ -174,8 +174,14 @@ Constraints:
   const queriesToProbe: { groupIndex: number; queryIndex: number; query: string }[] = [];
 
   // 1. Process intent groups & verify search signal concurrently via Suggest API
+  const validIntents = ["informational", "comparison", "transactional", "trust"] as const;
+  type IntentType = (typeof validIntents)[number];
+
   for (const rawGroup of rawData?.groups || []) {
-    const intentKey = (rawGroup.intent as keyof typeof DEFAULT_INTENT_LABELS) || "informational";
+    const rawIntent = String(rawGroup.intent || "informational").toLowerCase();
+    const intentKey: IntentType = (validIntents as readonly string[]).includes(rawIntent)
+      ? (rawIntent as IntentType)
+      : "informational";
     const label = DEFAULT_INTENT_LABELS[intentKey] || intentKey;
 
     const queryItems: QueryItem[] = await Promise.all(
@@ -203,7 +209,7 @@ Constraints:
     totalQueries += queryItems.length;
 
     groups.push({
-      intent: intentKey as any,
+      intent: intentKey,
       label,
       queries: queryItems,
     });
@@ -232,31 +238,38 @@ Constraints:
       }
     }
 
-    // Limit to max 8 probes concurrently to prevent rate limit
+    // Limit to max 8 probes with concurrency 4 to prevent rate limit while cutting probe time
     const activeCandidates = candidateQueries.slice(0, 8);
+    const BATCH_SIZE = 4;
 
-    for (const qItem of activeCandidates) {
-      testedCount++;
-      const res = await prober.probe(
-        {
-          id: `fanout-probe-${testedCount}`,
-          title: qItem.query,
-          prompt: qItem.query,
-          stage: "MoFU",
-          intent: "comparative",
-        },
-        brandName,
-        domain
+    for (let i = 0; i < activeCandidates.length; i += BATCH_SIZE) {
+      const batch = activeCandidates.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map(async (qItem, idx) => {
+          const probeId = `fanout-probe-${i + idx + 1}`;
+          const res = await prober.probe(
+            {
+              id: probeId,
+              title: qItem.query,
+              prompt: qItem.query,
+              stage: "MoFU",
+              intent: "comparative",
+            },
+            brandName,
+            domain
+          );
+
+          qItem.brandMentioned = res.brandMentioned;
+          qItem.mentionRank = res.mentionIndex;
+
+          testedCount++;
+          if (res.brandMentioned) {
+            coveredCount++;
+          } else {
+            criticalGaps.push(qItem);
+          }
+        })
       );
-
-      qItem.brandMentioned = res.brandMentioned;
-      qItem.mentionRank = res.mentionIndex;
-
-      if (res.brandMentioned) {
-        coveredCount++;
-      } else {
-        criticalGaps.push(qItem);
-      }
     }
 
     const coverageRate = testedCount > 0 ? Math.round((coveredCount / testedCount) * 100) : 0;

@@ -198,6 +198,7 @@ export interface DiscoveryStackReport {
     sitemapUrl?: string;
   };
   recommendations: string[];
+  fetchError?: string;
 }
 
 export type AiBotCategory = "search" | "training" | "mixed" | "agent";
@@ -230,6 +231,7 @@ export interface RobotsAuditReport {
   };
   botMatrix: BotAuditStatus[];
   recommendations: string[];
+  fetchError?: string;
 }
 
 export interface ContentDimensionScore {
@@ -257,6 +259,7 @@ export interface ContentAuditReport {
     advice: string;
     geoReference: string;
   }>;
+  fetchError?: string;
 }
 
 export interface EntityVariant {
@@ -453,7 +456,7 @@ export interface SchemaGeneratorReport {
   generatedJsonLd: string; // Ready-to-copy HTML <script type="application/ld+json">
   generatedSchemas: Array<{
     type: string;
-    jsonLd: Record<string, any>;
+    jsonLd: Record<string, unknown>;
   }>;
   validationIssues: string[];
 }

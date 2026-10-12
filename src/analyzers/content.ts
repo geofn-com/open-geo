@@ -1,23 +1,20 @@
 import * as cheerio from "cheerio";
 import type { ContentAuditReport, ContentDimensionScore } from "../types/index.js";
+import { safeFetchText } from "../lib/http.js";
 
 /**
  * 10-Dimension Content Citability Analyzer based on KDD 2024 GEO Research
  */
 export async function auditContentCitability(targetUrl: string, htmlContent?: string): Promise<ContentAuditReport> {
   let html = htmlContent || "";
+  let fetchError: string | undefined = undefined;
 
   if (!html) {
-    try {
-      const res = await fetch(targetUrl, {
-        headers: { "User-Agent": "open-geo-content-audit/1.0" },
-        signal: AbortSignal.timeout(10000),
-      });
-      if (res.ok) {
-        html = await res.text();
-      }
-    } catch {
-      // fallback
+    const fetchRes = await safeFetchText(targetUrl, { timeoutMs: 10000 });
+    if (fetchRes.ok && fetchRes.text) {
+      html = fetchRes.text;
+    } else {
+      fetchError = fetchRes.error;
     }
   }
 
@@ -233,5 +230,6 @@ export async function auditContentCitability(targetUrl: string, htmlContent?: st
     readingTimeMinutes,
     dimensions,
     topRecommendations,
+    fetchError,
   };
 }

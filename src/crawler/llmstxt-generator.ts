@@ -3,6 +3,7 @@ import { UniversalLLMProber } from "../probers/llm.js";
 import type { LlmsTxtOutput, PageInfo } from "../types/index.js";
 import { USER_AGENT as CRAWLER_USER_AGENT } from "../lib/version.js";
 import { normalizeUrl } from "../lib/url.js";
+import { safeFetchText } from "../lib/http.js";
 
 /**
  * Categorizes a page URL into functional sections
@@ -48,16 +49,13 @@ async function discoverSitemapUrls(origin: string, maxPages: number): Promise<st
   const discovered: string[] = [];
 
   for (const sUrl of sitemapUrls) {
-    try {
-      const res = await fetch(sUrl, {
-        headers: {
-          "User-Agent": CRAWLER_USER_AGENT,
-        },
-        signal: AbortSignal.timeout(8000),
-      });
+    const res = await safeFetchText(sUrl, {
+      userAgent: CRAWLER_USER_AGENT,
+      timeoutMs: 8000,
+    });
 
-      if (res.ok) {
-        const xml = await res.text();
+    if (res.ok && res.text) {
+      const xml = res.text;
         const locRegex = /<loc>(https?:\/\/[^<]+)<\/loc>/gi;
         let match;
         while ((match = locRegex.exec(xml)) !== null) {
@@ -81,12 +79,9 @@ async function discoverSitemapUrls(origin: string, maxPages: number): Promise<st
         }
         if (discovered.length > 0) return discovered;
       }
-    } catch {
-      // ignore
     }
-  }
 
-  return discovered;
+    return discovered;
 }
 
 /**
@@ -138,15 +133,13 @@ export async function generateLlmsTxt(options: {
   let homeH1 = "";
 
   try {
-    const res = await fetch(origin, {
-      headers: {
-        "User-Agent": CRAWLER_USER_AGENT,
-      },
-      signal: AbortSignal.timeout(10000),
+    const res = await safeFetchText(origin, {
+      userAgent: CRAWLER_USER_AGENT,
+      timeoutMs: 10000,
     });
 
-    if (res.ok) {
-      const html = await res.text();
+    if (res.ok && res.text) {
+      const html = res.text;
       const $ = cheerio.load(html);
 
       homeTitle = $("title").text().trim() || baseUrl.hostname;
@@ -208,16 +201,13 @@ export async function generateLlmsTxt(options: {
     if (pages.length >= maxPages) break;
     if (subUrl === origin) continue;
 
-    try {
-      const res = await fetch(subUrl, {
-        headers: {
-          "User-Agent": CRAWLER_USER_AGENT,
-        },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!res.ok) continue;
+    const res = await safeFetchText(subUrl, {
+      userAgent: CRAWLER_USER_AGENT,
+      timeoutMs: 8000,
+    });
+    if (!res.ok || !res.text) continue;
 
-      const html = await res.text();
+    const html = res.text;
       const $ = cheerio.load(html);
 
       const title = $("title").text().trim() || subUrl;
@@ -241,12 +231,9 @@ export async function generateLlmsTxt(options: {
         category,
         priority,
       });
-    } catch {
-      // skip
     }
-  }
 
-  // Sort pages by priority
+    // Sort pages by priority
   pages.sort((a, b) => a.priority - b.priority);
 
   // 4. Generate High-Density Blockquote (LLM-synthesized if possible)

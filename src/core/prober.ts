@@ -41,11 +41,15 @@ export async function runCommunityProbe(options: ProbeOptions): Promise<GeoScore
   // 4. Initialize single model prober
   const prober = new UniversalLLMProber(model ? { model } : undefined);
 
-  // 5. Probe sequentially or in small batch
+  // 5. Probe with controlled concurrency pool (concurrency 3)
+  const CONCURRENCY_LIMIT = 3;
   const results: ProberResult[] = [];
-  for (const prompt of prompts) {
-    const res = await prober.probe(prompt, brand, domain);
-    results.push(res);
+  for (let i = 0; i < prompts.length; i += CONCURRENCY_LIMIT) {
+    const batch = prompts.slice(i, i + CONCURRENCY_LIMIT);
+    const batchResults = await Promise.all(
+      batch.map((prompt) => prober.probe(prompt, brand, domain))
+    );
+    results.push(...batchResults);
   }
 
   // 6. Compute scorecard and attach technical audit report

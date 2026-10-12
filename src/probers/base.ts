@@ -1,4 +1,5 @@
 import type { ProberResult, SyntheticPrompt } from "../types/index.js";
+import { computeSentiment } from "../analyzers/response-analyzer.js";
 
 export interface IProber {
   name: string;
@@ -6,31 +7,27 @@ export interface IProber {
 }
 
 /**
- * Extracts URLs and Markdown links from text
+ * Extracts URLs and Markdown links from text in O(n) using a Set
  */
 export function extractUrls(text: string): string[] {
-  const urls: string[] = [];
+  const urlSet = new Set<string>();
   
   // Markdown links [text](url)
   const mdRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
   let match;
   while ((match = mdRegex.exec(text)) !== null) {
     const cleanUrl = match[2].replace(/[.,;:)]+$/, "");
-    if (!urls.includes(cleanUrl)) {
-      urls.push(cleanUrl);
-    }
+    urlSet.add(cleanUrl);
   }
 
   // Raw URLs
   const rawUrlRegex = /(https?:\/\/[^\s<>"']+)/g;
   while ((match = rawUrlRegex.exec(text)) !== null) {
     const cleanUrl = match[1].replace(/[.,;:)]+$/, "");
-    if (!urls.includes(cleanUrl)) {
-      urls.push(cleanUrl);
-    }
+    urlSet.add(cleanUrl);
   }
 
-  return urls;
+  return Array.from(urlSet);
 }
 
 /**
@@ -120,16 +117,9 @@ export function evaluateResponse(
     }
   }
 
-  // Sentiment heuristic
-  let sentiment: "positive" | "neutral" | "negative" = "neutral";
-  const positiveWords = ["recommended", "best", "great", "powerful", "leader", "excellent", "top-tier", "leading", "reliable", "intuitive"];
-  const negativeWords = ["poor", "flaw", "lacking", "expensive", "buggy", "inferior", "worst", "unreliable", "overpriced", "drawback"];
-
-  const posHits = positiveWords.filter((w) => lowerText.includes(w)).length;
-  const negHits = negativeWords.filter((w) => lowerText.includes(w)).length;
-
-  if (posHits > negHits + 1) sentiment = "positive";
-  else if (negHits > posHits + 1) sentiment = "negative";
+  // Sentiment analysis using unified engine
+  const sentimentResult = computeSentiment(text);
+  const sentiment = sentimentResult.label;
 
   return {
     mentioned: true,

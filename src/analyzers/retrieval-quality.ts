@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import type { RetrievalQualityReport } from "../types/index.js";
 import { normalizeUrl } from "../lib/url.js";
+import { safeFetchText } from "../lib/http.js";
 
 export interface AuditRetrievalQualityOptions {
   url: string;
@@ -17,23 +18,14 @@ export async function auditRetrievalQuality(
   const targetUrl = normalizeUrl(typeof options === "string" ? options : options.url);
   let html = typeof options === "object" ? options.htmlContent || "" : "";
   let redirectsCount = 0;
+  let fetchError: string | undefined = undefined;
 
   if (!html) {
-    try {
-      const res = await fetch(targetUrl, {
-        headers: { "User-Agent": "open-geo-retrieval-audit/1.0" },
-        redirect: "follow",
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (res.ok) {
-        html = await res.text();
-        if (res.redirected) {
-          redirectsCount = 1;
-        }
-      }
-    } catch (err: any) {
-      // fallback
+    const fetchRes = await safeFetchText(targetUrl, { timeoutMs: 10000 });
+    if (fetchRes.ok && fetchRes.text) {
+      html = fetchRes.text;
+    } else {
+      fetchError = fetchRes.error;
     }
   }
 

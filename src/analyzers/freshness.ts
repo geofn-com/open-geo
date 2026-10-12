@@ -2,6 +2,8 @@ import * as cheerio from "cheerio";
 import type { ContentFreshnessReport, FreshnessPageItem } from "../types/index.js";
 import { normalizeUrl } from "../lib/url.js";
 
+import { safeFetchText } from "../lib/http.js";
+
 export interface AuditContentFreshnessOptions {
   url: string;
   maxPages?: number;
@@ -56,78 +58,72 @@ export async function auditContentFreshness(
   const maxPages = typeof options === "object" ? options.maxPages || 15 : 15;
   const mockPages = typeof options === "object" ? options.mockPages : undefined;
 
-  const urlObj = new URL(targetUrl);
-  const domain = urlObj.hostname.replace(/^www\./, "");
-  const sitemapUrl = `${urlObj.origin}/sitemap.xml`;
+  let domain = "";
+  let sitemapUrl = "";
+  try {
+    const urlObj = new URL(targetUrl);
+    domain = urlObj.hostname.replace(/^www\./, "");
+    sitemapUrl = `${urlObj.origin}/sitemap.xml`;
+  } catch {
+    domain = targetUrl.replace(/^https?:\/\//, "").split("/")[0].replace(/^www\./, "");
+    sitemapUrl = `${targetUrl}/sitemap.xml`;
+  }
 
   let pages: FreshnessPageItem[] = mockPages ? [...mockPages] : [];
+  let fetchError: string | undefined = undefined;
 
   if (pages.length === 0) {
     // 1. Try sitemap.xml first
-    try {
-      const sitemapRes = await fetch(sitemapUrl, {
-        headers: { "User-Agent": "open-geo-freshness/1.0" },
-        signal: AbortSignal.timeout(6000),
-      });
-
-      if (sitemapRes.ok) {
-        const xmlText = await sitemapRes.text();
-        pages = parseSitemapUrls(xmlText, maxPages);
-      }
-    } catch {
-      // fallback
+    const sitemapFetch = await safeFetchText(sitemapUrl, { timeoutMs: 6000 });
+    if (sitemapFetch.ok && sitemapFetch.text) {
+      pages = parseSitemapUrls(sitemapFetch.text, maxPages);
     }
 
     // 2. If no sitemap pages found, inspect the target page directly
     if (pages.length === 0) {
-      try {
-        const pageRes = await fetch(targetUrl, {
-          headers: { "User-Agent": "open-geo-freshness/1.0" },
-          signal: AbortSignal.timeout(8000),
-        });
+      const pageFetch = await safeFetchText(targetUrl, { timeoutMs: 8000 });
+      if (!pageFetch.ok) {
+        fetchError = pageFetch.error;
+      } else if (pageFetch.text) {
+        let detectedDate: string | undefined = undefined;
+        let source: "sitemap_lastmod" | "http_header" | "og_meta" | "schema_date" = "og_meta";
 
-        const lastModifiedHeader = pageRes.headers.get("last-modified");
-        let detectedDate: string | undefined = lastModifiedHeader || undefined;
-        let source: "sitemap_lastmod" | "http_header" | "og_meta" | "schema_date" = "http_header";
+        const html = pageFetch.text;
+        const $ = cheerio.load(html);
 
-        if (pageRes.ok) {
-          const html = await pageRes.text();
-          const $ = cheerio.load(html);
+        const ogTime =
+          $('meta[property="og:updated_time"]').attr("content") ||
+          $('meta[property="article:modified_time"]').attr("content") ||
+          $('meta[name="revised"]').attr("content");
 
-          const ogTime =
-            $('meta[property="og:updated_time"]').attr("content") ||
-            $('meta[property="article:modified_time"]').attr("content") ||
-            $('meta[name="revised"]').attr("content");
-
-          if (ogTime) {
-            detectedDate = ogTime;
-            source = "og_meta";
-          } else {
-            $('script[type="application/ld+json"]').each((_, el) => {
-              try {
-                const parsed = JSON.parse($(el).html() || "");
-                if (parsed.dateModified) {
-                  detectedDate = parsed.dateModified;
-                  source = "schema_date";
-                }
-              } catch {
-                // ignore
+        if (ogTime) {
+          detectedDate = ogTime;
+          source = "og_meta";
+        } else {
+          $('script[type="application/ld+json"]').each((_, el) => {
+            try {
+              const parsed = JSON.parse($(el).html() || "");
+              if (parsed.dateModified) {
+                detectedDate = parsed.dateModified;
+                source = "schema_date";
               }
-            });
-          }
+            } catch {
+              // ignore
+            }
+          });
         }
 
-        let ageInDays = 15;
+        let ageInDays = 45; // Default moderate age
         if (detectedDate) {
-          const parsed = new Date(detectedDate).getTime();
-          if (!isNaN(parsed)) {
-            ageInDays = Math.max(0, Math.round((Date.now() - parsed) / (1000 * 3600 * 24)));
+          const parsedTime = new Date(detectedDate).getTime();
+          if (!isNaN(parsedTime)) {
+            ageInDays = Math.max(0, Math.round((Date.now() - parsedTime) / (1000 * 60 * 60 * 24)));
           }
         }
 
-        let status: "fresh" | "moderate" | "stale" = "fresh";
-        if (ageInDays > 180) status = "stale";
-        else if (ageInDays > 30) status = "moderate";
+        let status: "fresh" | "moderate" | "stale" = "moderate";
+        if (ageInDays <= 30) status = "fresh";
+        else if (ageInDays > 180) status = "stale";
 
         pages.push({
           url: targetUrl,
@@ -135,13 +131,6 @@ export async function auditContentFreshness(
           ageInDays,
           status,
           source,
-        });
-      } catch {
-        pages.push({
-          url: targetUrl,
-          ageInDays: 45,
-          status: "moderate",
-          source: "http_header",
         });
       }
     }

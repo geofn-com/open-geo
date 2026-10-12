@@ -3,6 +3,7 @@ import { UniversalLLMProber } from "../probers/llm.js";
 import type { FaqItem, FaqOutput } from "../types/index.js";
 import { USER_AGENT as FAQ_USER_AGENT } from "../lib/version.js";
 import { normalizeUrl } from "../lib/url.js";
+import { safeFetchText } from "../lib/http.js";
 
 /**
  * Generate high-impact FAQs and Schema.org JSON-LD markup for a webpage or text content
@@ -19,25 +20,21 @@ export async function generateFaq(input: {
 
   // 1. Fetch webpage if URL is provided
   if (url && !content) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent": FAQ_USER_AGENT,
-        },
-        signal: AbortSignal.timeout(10000),
-      });
+    const res = await safeFetchText(url, {
+      userAgent: FAQ_USER_AGENT,
+      timeoutMs: 10000,
+    });
 
-      if (res.ok) {
-        const html = await res.text();
-        const $ = cheerio.load(html);
+    if (res.ok && res.text) {
+      const html = res.text;
+      const $ = cheerio.load(html);
 
-        pageTitle = $("title").text().trim();
-        // Remove script, style, nav, footer tags
-        $("script, style, nav, footer, noscript, svg").remove();
-        content = $("body").text().replace(/\s+/g, " ").trim().substring(0, 4000);
-      }
-    } catch (err: any) {
-      throw new Error(`Failed to fetch content from ${url}: ${err.message}`);
+      pageTitle = $("title").text().trim();
+      // Remove script, style, nav, footer tags
+      $("script, style, nav, footer, noscript, svg").remove();
+      content = $("body").text().replace(/\s+/g, " ").trim().substring(0, 4000);
+    } else {
+      throw new Error(`Failed to fetch content from ${url}: ${res.error || "Unknown network error"}`);
     }
   }
 

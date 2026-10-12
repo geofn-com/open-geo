@@ -1,18 +1,11 @@
 import * as cheerio from "cheerio";
 import type { DiscoveryStackReport } from "../types/index.js";
 import { normalizeUrl } from "../lib/url.js";
+import { safeFetchText } from "../lib/http.js";
 
 async function probeUrl(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "User-Agent": "open-geo-discovery/1.0" },
-      signal: AbortSignal.timeout(5000),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  const res = await safeFetchText(url, { timeoutMs: 5000 });
+  return res.ok;
 }
 
 /**
@@ -20,8 +13,13 @@ async function probeUrl(url: string): Promise<boolean> {
  */
 export async function auditDiscoveryStack(rawTargetUrl: string): Promise<DiscoveryStackReport> {
   const targetUrl = normalizeUrl(rawTargetUrl);
-  const urlObj = new URL(targetUrl);
-  const base = urlObj.origin;
+  let base: string;
+  try {
+    const urlObj = new URL(targetUrl);
+    base = urlObj.origin;
+  } catch {
+    base = targetUrl;
+  }
 
   // Concurrent probing for AI protocol endpoints
   const [
@@ -39,19 +37,15 @@ export async function auditDiscoveryStack(rawTargetUrl: string): Promise<Discove
     probeUrl(`${base}/.well-known/mcp.json`).then((ok) => (ok ? true : probeUrl(`${base}/mcp.json`))),
     probeUrl(`${base}/.well-known/agent-card.json`),
     probeUrl(`${base}/sitemap.xml`),
-    fetch(targetUrl, {
-      headers: { "User-Agent": "open-geo-discovery/1.0" },
-      signal: AbortSignal.timeout(8000),
-    }).catch(() => null),
+    safeFetchText(targetUrl, { timeoutMs: 8000 }),
   ]);
 
   let jsonLd = false;
   let faqSchema = false;
 
-  if (pageHtmlRes && pageHtmlRes.ok) {
+  if (pageHtmlRes && pageHtmlRes.ok && pageHtmlRes.text) {
     try {
-      const html = await pageHtmlRes.text();
-      const $ = cheerio.load(html);
+      const $ = cheerio.load(pageHtmlRes.text);
       $('script[type="application/ld+json"]').each((_, el) => {
         try {
           const raw = $(el).html() || "";
@@ -72,23 +66,16 @@ export async function auditDiscoveryStack(rawTargetUrl: string): Promise<Discove
 
   // Check robots.txt for AI crawlers
   let robotsTxtAiCrawlers = false;
-  try {
-    const robotsRes = await fetch(`${base}/robots.txt`, {
-      headers: { "User-Agent": "open-geo-discovery/1.0" },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (robotsRes.ok) {
-      const text = await robotsRes.text();
-      if (
-        text.toLowerCase().includes("gptbot") ||
-        text.toLowerCase().includes("claudebot") ||
-        text.toLowerCase().includes("perplexitybot")
-      ) {
-        robotsTxtAiCrawlers = true;
-      }
+  const robotsRes = await safeFetchText(`${base}/robots.txt`, { timeoutMs: 5000 });
+  if (robotsRes.ok && robotsRes.text) {
+    const text = robotsRes.text.toLowerCase();
+    if (
+      text.includes("gptbot") ||
+      text.includes("claudebot") ||
+      text.includes("perplexitybot")
+    ) {
+      robotsTxtAiCrawlers = true;
     }
-  } catch {
-    // robots not reachable
   }
 
   // Weight Calculation:
