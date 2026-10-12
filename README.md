@@ -2,6 +2,9 @@
 
 > **Open-source, AI-Native Generative Engine Optimization (GEO) & Technical Audit Suite.**  
 > Like Lighthouse for Google SEO, `open-geo` is the open standard toolkit for Generative Engine Optimization (ChatGPT Search, Perplexity, Google AIO, Claude).
+> Open-source **AI visibility checker** for the ChatGPT era: audit how AI assistants see your brand, then generate the fixes (llms.txt, robots.txt, Schema.org) that unblock them.
+
+**Website:** [geofn.com](https://geofn.com) · **Compare SaaS tools:** [Profound & OtterlyAI alternatives](https://geofn.com/alternatives/profound)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-brightgreen.svg)](https://nodejs.org)
@@ -128,6 +131,23 @@ Once connected, your AI assistant can invoke all 8 native MCP tools:
 * `geo_suggest_keywords`: Mine real-time Google & Bing search suggestions and intent stages (ToFU/MoFU/BoFU).
 
 ---
+
+## ❓ FAQ
+
+**What is open-geo?**
+An open-source AI visibility checker and GEO (Generative Engine Optimization) toolkit. It audits your robots.txt AI-crawler rules, llms.txt, and Schema.org entities, probes how AI models respond to your brand, and generates patches — running 100% locally.
+
+**Is there an open-source alternative to OtterlyAI, Profound, or Peec AI?**
+Yes — that's the gap open-geo fills. Unlike those closed SaaS dashboards, open-geo is MIT-licensed and self-hosted: your data never leaves your machine, and every rule it applies is auditable.
+
+**Which AI models can I probe?**
+`open-geo probe` runs single-model probes with your own API key — OpenRouter (100+ models with one key) or direct Gemini / DeepSeek keys. The hosted dashboard at [geofn.com](https://geofn.com) runs multi-engine monitoring (ChatGPT, Perplexity, Google AI Overviews, Gemini).
+
+**Does open-geo upload my data?**
+No. Everything runs locally with zero telemetry and zero data uploaded.
+
+**How is it different from a visibility dashboard?**
+Dashboards observe; open-geo fixes. It generates executable patches for robots.txt, llms.txt, and JSON-LD, and ships MCP tools so coding agents like Cursor and Claude Code can apply them for you.
 
 ## 🤝 Contributing & License
 
