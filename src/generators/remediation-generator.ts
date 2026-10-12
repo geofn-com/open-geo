@@ -45,10 +45,10 @@ export function generateJsonLdPatch(domain: string, brand: string, pageType: "ho
         url: `https://${domain}`,
         logo: `https://${domain}/logo.png`,
         sameAs: [
-          `https://twitter.com/${brand.toLowerCase()}`,
-          `https://github.com/${brand.toLowerCase()}`,
-          `https://linkedin.com/company/${brand.toLowerCase()}`,
-        ],
+          `https://twitter.com/${brand.toLowerCase().replace(/[^a-z0-9_-]/g, "")}`,
+          `https://github.com/${brand.toLowerCase().replace(/[^a-z0-9_-]/g, "")}`,
+          `https://linkedin.com/company/${brand.toLowerCase().replace(/[^a-z0-9_-]/g, "")}`,
+        ].filter((link) => !link.endsWith("/")),
       },
       {
         "@type": pageType === "product" ? "SoftwareApplication" : "WebSite",

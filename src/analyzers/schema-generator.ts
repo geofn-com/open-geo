@@ -1,12 +1,20 @@
 import * as cheerio from "cheerio";
 import type { SchemaGeneratorReport } from "../types/index.js";
 import { normalizeUrl } from "../lib/url.js";
+import { safeFetchText } from "../lib/http.js";
 
 export interface GenerateSchemaOptions {
   url: string;
   brandName?: string;
   category?: string;
   htmlContent?: string;
+}
+
+/**
+ * Normalizes brand name to valid alphanumeric social handle
+ */
+function slugifyHandle(brand: string): string {
+  return brand.toLowerCase().replace(/[^a-z0-9_-]/g, "");
 }
 
 /**
@@ -19,25 +27,29 @@ export async function generateFullSchema(
   const targetUrl = normalizeUrl(typeof options === "string" ? options : options.url);
   const brandName = typeof options === "object" ? options.brandName : undefined;
   let html = typeof options === "object" ? options.htmlContent || "" : "";
+  let fetchError: string | undefined = undefined;
 
   if (!html) {
-    try {
-      const res = await fetch(targetUrl, {
-        headers: { "User-Agent": "open-geo-schema-gen/1.0" },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) {
-        html = await res.text();
-      }
-    } catch {
-      // fallback
+    const fetchRes = await safeFetchText(targetUrl, { timeoutMs: 8000 });
+    if (fetchRes.ok && fetchRes.text) {
+      html = fetchRes.text;
+    } else {
+      fetchError = fetchRes.error;
     }
   }
 
   const $ = cheerio.load(html || "<html><head></head><body></body></html>");
-  const urlObj = new URL(targetUrl);
-  const domain = urlObj.hostname.replace(/^www\./, "");
-  const baseOrigin = urlObj.origin;
+  let domain = "";
+  let baseOrigin = "";
+  let urlObj: URL | null = null;
+  try {
+    urlObj = new URL(targetUrl);
+    domain = urlObj.hostname.replace(/^www\./, "");
+    baseOrigin = urlObj.origin;
+  } catch {
+    domain = targetUrl.replace(/^https?:\/\//, "").split("/")[0].replace(/^www\./, "");
+    baseOrigin = targetUrl;
+  }
 
   // 1. Detect Existing Schemas
   const detectedSchemas: string[] = [];
@@ -90,10 +102,10 @@ export async function generateFullSchema(
         "logo": logo.startsWith("http") ? logo : `${baseOrigin}${logo}`,
         "description": description,
         "sameAs": [
-          `https://twitter.com/${derivedBrand.toLowerCase()}`,
-          `https://github.com/${derivedBrand.toLowerCase()}`,
-          `https://linkedin.com/company/${derivedBrand.toLowerCase()}`,
-        ],
+          `https://twitter.com/${slugifyHandle(derivedBrand)}`,
+          `https://github.com/${slugifyHandle(derivedBrand)}`,
+          `https://linkedin.com/company/${slugifyHandle(derivedBrand)}`,
+        ].filter((link) => !link.endsWith("/")),
       },
     });
   }
@@ -139,7 +151,7 @@ export async function generateFullSchema(
   }
 
   // Schema 4: BreadcrumbList (if path has depth)
-  if (urlObj.pathname.length > 1 && !detectedSchemas.includes("BreadcrumbList")) {
+  if (urlObj && urlObj.pathname.length > 1 && !detectedSchemas.includes("BreadcrumbList")) {
     missingRecommendedSchemas.push("BreadcrumbList");
     const segments = urlObj.pathname.split("/").filter(Boolean);
     const itemListElement = [
@@ -152,7 +164,7 @@ export async function generateFullSchema(
     ];
 
     let runningPath = baseOrigin;
-    segments.forEach((seg, i) => {
+    segments.forEach((seg: string, i: number) => {
       runningPath += `/${seg}`;
       itemListElement.push({
         "@type": "ListItem",

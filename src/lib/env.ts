@@ -26,6 +26,3 @@ export function loadEnv(): void {
   // 3. Fallback default dotenv config
   dotenv.config();
 }
-
-// Auto-run on import
-loadEnv();

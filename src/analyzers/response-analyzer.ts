@@ -117,6 +117,72 @@ async function verifyUrlReachable(rawTargetUrl: string): Promise<VerifiedCitatio
   }
 }
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export interface SentimentAnalysisResult {
+  score: number;
+  label: "positive" | "neutral" | "negative";
+  positiveKeywords: string[];
+  negativeKeywords: string[];
+}
+
+/**
+ * Robust sentiment analysis with negation context and hyphen-word boundaries
+ */
+export function computeSentiment(text: string): SentimentAnalysisResult {
+  const lowerText = text.toLowerCase();
+  const matchedPos: string[] = [];
+  const matchedNeg: string[] = [];
+
+  for (const w of POSITIVE_WORDS) {
+    const escaped = escapeRegex(w);
+    const regex = new RegExp(`(?:^|[^a-zA-Z0-9_-])${escaped}(?:$|[^a-zA-Z0-9_-])`, "i");
+    if (regex.test(lowerText)) {
+      const negationCheck = new RegExp(`\\b(?:not|no|never|hardly|barely|lacks?)\\s+(?:\\w+\\s+)?${escaped}\\b`, "i");
+      if (negationCheck.test(lowerText)) {
+        matchedNeg.push(`not ${w}`);
+      } else {
+        matchedPos.push(w);
+      }
+    }
+  }
+
+  for (const w of NEGATIVE_WORDS) {
+    const escaped = escapeRegex(w);
+    const regex = new RegExp(`(?:^|[^a-zA-Z0-9_-])${escaped}(?:$|[^a-zA-Z0-9_-])`, "i");
+    if (regex.test(lowerText)) {
+      const negationCheck = new RegExp(`\\b(?:not|no|never|hardly|barely|without)\\s+(?:\\w+\\s+)?${escaped}\\b`, "i");
+      if (negationCheck.test(lowerText)) {
+        matchedPos.push(`not ${w}`);
+      } else {
+        matchedNeg.push(w);
+      }
+    }
+  }
+
+  let sentimentScore = 0.0;
+  const posCount = matchedPos.length;
+  const negCount = matchedNeg.length;
+  const totalMatches = posCount + negCount;
+
+  if (totalMatches > 0) {
+    sentimentScore = Math.round(((posCount - negCount) / Math.max(posCount + negCount, 1)) * 100) / 100;
+  }
+
+  let sentimentLabel: "positive" | "neutral" | "negative" = "neutral";
+  if (sentimentScore >= 0.25) sentimentLabel = "positive";
+  else if (sentimentScore <= -0.25) sentimentLabel = "negative";
+
+  return {
+    score: sentimentScore,
+    label: sentimentLabel,
+    positiveKeywords: matchedPos,
+    negativeKeywords: matchedNeg,
+  };
+}
+
 export interface AnalyzeResponseOptions {
   text: string;
   brand?: string;
@@ -183,36 +249,7 @@ export async function analyzeLlmResponse(
   }
 
   // 3. Nuanced Sentiment Analysis (-1.0 to +1.0)
-  const matchedPos: string[] = [];
-  const matchedNeg: string[] = [];
-
-  for (const w of POSITIVE_WORDS) {
-    const regex = new RegExp(`\\b${w}\\b`, "i");
-    if (regex.test(lowerText)) {
-      matchedPos.push(w);
-    }
-  }
-
-  for (const w of NEGATIVE_WORDS) {
-    const regex = new RegExp(`\\b${w}\\b`, "i");
-    if (regex.test(lowerText)) {
-      matchedNeg.push(w);
-    }
-  }
-
-  let sentimentScore = 0.0;
-  const posCount = matchedPos.length;
-  const negCount = matchedNeg.length;
-  const totalMatches = posCount + negCount;
-
-  if (totalMatches > 0) {
-    // Normalization curve: yields positive value for pos, negative for neg
-    sentimentScore = Math.round(((posCount - negCount) / Math.max(posCount + negCount, 1)) * 100) / 100;
-  }
-
-  let sentimentLabel: "positive" | "neutral" | "negative" = "neutral";
-  if (sentimentScore >= 0.25) sentimentLabel = "positive";
-  else if (sentimentScore <= -0.25) sentimentLabel = "negative";
+  const sentiment = computeSentiment(text);
 
   // 4. URL Extraction & Anti-Hallucination Verification
   const urlMatches = text.match(/https?:\/\/[^\s\)\],>"']+/gi) || [];
@@ -315,12 +352,7 @@ export async function analyzeLlmResponse(
     brandRank,
     brandContextSnippet,
     detectedCompetitors: detectedCompetitors.slice(0, 8),
-    sentiment: {
-      score: sentimentScore,
-      label: sentimentLabel,
-      positiveKeywords: matchedPos,
-      negativeKeywords: matchedNeg,
-    },
+    sentiment,
     extractedUrls,
     verifiedCitations,
     verificationSummary,

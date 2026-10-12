@@ -2,6 +2,8 @@ import * as cheerio from "cheerio";
 import type { EntityConsistencyReport, EntityVariant } from "../types/index.js";
 import { normalizeUrl } from "../lib/url.js";
 
+import { safeFetchText } from "../lib/http.js";
+
 /**
  * Normalizes text to compare base brand tokens
  */
@@ -19,20 +21,24 @@ export async function auditEntityConsistency(
 ): Promise<EntityConsistencyReport> {
   const targetUrl = normalizeUrl(rawTargetUrl);
   let html = rawHtml || "";
+  let fetchError: string | undefined = undefined;
+
   if (!html) {
-    try {
-      const res = await fetch(targetUrl, {
-        headers: { "User-Agent": "open-geo-entity-audit/1.0" },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) html = await res.text();
-    } catch {
-      // fallback
+    const fetchRes = await safeFetchText(targetUrl, { timeoutMs: 8000 });
+    if (fetchRes.ok && fetchRes.text) {
+      html = fetchRes.text;
+    } else {
+      fetchError = fetchRes.error;
     }
   }
 
   const $ = cheerio.load(html);
-  const domain = new URL(targetUrl).hostname.replace(/^www\./, "");
+  let domain = "";
+  try {
+    domain = new URL(targetUrl).hostname.replace(/^www\./, "");
+  } catch {
+    domain = targetUrl.replace(/^https?:\/\//, "").split("/")[0].replace(/^www\./, "");
+  }
   const domainBase = domain.split(".")[0];
 
   // 1. Detect Brand Candidates from Title, H1, and JSON-LD
@@ -87,23 +93,28 @@ export async function auditEntityConsistency(
   // Check H1/H2
   $("h1, h2").each((_, el) => {
     const text = $(el).text();
-    const words = text.split(/\s+/);
+    const words = text.split(/\s+/).filter(Boolean);
     for (let i = 0; i < words.length; i++) {
-      const single = words[i];
-      const double = words.slice(i, i + 2).join(" ");
+      const single = words[i]!;
       if (cleanToken(single) === canonicalClean) recordVariant(single, "heading");
-      if (cleanToken(double) === canonicalClean) recordVariant(double, "heading");
+      if (i + 1 < words.length) {
+        const double = `${single} ${words[i + 1]}`;
+        if (cleanToken(double) === canonicalClean) recordVariant(double, "heading");
+      }
     }
   });
 
-  // Check Body
+  // Check Body (linear single-pass scan with bounded token depth)
   const bodyText = $("body").text();
-  const bodyWords = bodyText.split(/\s+/);
-  for (let i = 0; i < bodyWords.length; i++) {
-    const single = bodyWords[i];
-    const double = bodyWords.slice(i, i + 2).join(" ");
+  const bodyWords = bodyText.split(/\s+/).filter(Boolean);
+  const maxScanWords = Math.min(bodyWords.length, 5000);
+  for (let i = 0; i < maxScanWords; i++) {
+    const single = bodyWords[i]!;
     if (cleanToken(single) === canonicalClean) recordVariant(single, "body");
-    if (cleanToken(double) === canonicalClean) recordVariant(double, "body");
+    if (i + 1 < maxScanWords) {
+      const double = `${single} ${bodyWords[i + 1]}`;
+      if (cleanToken(double) === canonicalClean) recordVariant(double, "body");
+    }
   }
 
   // If no variants matched from text scanning, ensure canonical exists

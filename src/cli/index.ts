@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import "../lib/env.js";
+import { loadEnv } from "../lib/env.js";
+loadEnv();
 import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
@@ -16,6 +17,8 @@ import { startMcpServer } from "../mcp/server.js";
 import { VERSION } from "../lib/version.js";
 import { normalizeUrl } from "../lib/url.js";
 import { safeAtomicWrite, FileExistsError } from "../lib/fs-atomic.js";
+import { validatePublicUrl } from "../lib/security.js";
+import { sanitizeError } from "../lib/sanitize.js";
 
 const program = new Command();
 
@@ -42,11 +45,18 @@ program
   .option("-o, --output <path>", "Report markdown output file path")
   .option("-f, --force", "Force overwrite output file if it already exists", false)
   .action(async (url, options) => {
-    console.log(chalk.bold.cyan(`\n🛠️ Auditing target webpage: ${chalk.yellow(url)}`));
+    const validated = validatePublicUrl(url, { allowPrivate: true });
+    if (!validated.isValid || !validated.normalizedUrl) {
+      console.error(chalk.red(`\n❌ Invalid target URL: ${validated.error || "Please provide a valid HTTP(S) URL."}\n`));
+      process.exit(1);
+    }
+    const targetUrl = validated.normalizedUrl;
+
+    console.log(chalk.bold.cyan(`\n🛠️ Auditing target webpage: ${chalk.yellow(targetUrl)}`));
     const spinner = ora("Analyzing HTML structure, Schema.org, llms.txt, and AI crawler rules...").start();
 
     try {
-      const auditResult = await auditWebpage(url);
+      const auditResult = await auditWebpage(targetUrl);
       spinner.succeed(chalk.green("Audit complete!"));
 
       const reportMarkdown = formatAuditMarkdownReport(auditResult);
@@ -79,7 +89,7 @@ program
 
       printCommercialHook();
     } catch (err: any) {
-      spinner.fail(chalk.red(`Audit failed: ${err.message}`));
+      spinner.fail(chalk.red(`Audit failed: ${sanitizeError(err)}`));
       process.exit(1);
     }
   });
@@ -93,12 +103,19 @@ program
   .option("--full", "Also generate comprehensive llms-full.md documentation", false)
   .option("-f, --force", "Force overwrite output file if it already exists", false)
   .action(async (url, options) => {
-    console.log(chalk.bold.cyan(`\n📑 Generating llms.txt for website: ${chalk.yellow(url)}`));
+    const validated = validatePublicUrl(url, { allowPrivate: true });
+    if (!validated.isValid || !validated.normalizedUrl) {
+      console.error(chalk.red(`\n❌ Invalid target URL: ${validated.error || "Please provide a valid HTTP(S) URL."}\n`));
+      process.exit(1);
+    }
+    const targetUrl = validated.normalizedUrl;
+
+    console.log(chalk.bold.cyan(`\n📑 Generating llms.txt for website: ${chalk.yellow(targetUrl)}`));
     const spinner = ora("Crawling site architecture and core page summaries...").start();
 
     try {
       const result = await generateLlmsTxt({
-        url,
+        url: targetUrl,
         includeFull: options.full,
       });
 
@@ -115,7 +132,7 @@ program
 
       printCommercialHook();
     } catch (err: any) {
-      spinner.fail(chalk.red(`Generation failed: ${err.message}`));
+      spinner.fail(chalk.red(`Generation failed: ${sanitizeError(err)}`));
       process.exit(1);
     }
   });
@@ -133,10 +150,24 @@ program
     const spinner = ora("Extracting core questions and synthesizing structured data...").start();
 
     try {
-      const isUrl = /^https?:\/\//i.test(urlOrText);
+      const isUrl = /^https?:\/\//i.test(urlOrText) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(urlOrText);
+      let targetUrl: string | undefined;
+      let targetText: string | undefined;
+
+      if (isUrl) {
+        const validated = validatePublicUrl(urlOrText, { allowPrivate: true });
+        if (!validated.isValid || !validated.normalizedUrl) {
+          spinner.fail(chalk.red(`Invalid target URL: ${validated.error}`));
+          process.exit(1);
+        }
+        targetUrl = validated.normalizedUrl;
+      } else {
+        targetText = urlOrText;
+      }
+
       const result = await generateFaq({
-        url: isUrl ? urlOrText : undefined,
-        text: isUrl ? undefined : urlOrText,
+        url: targetUrl,
+        text: targetText,
         count: parseInt(options.count, 10),
       });
 
@@ -153,7 +184,7 @@ program
 
       printCommercialHook();
     } catch (err: any) {
-      spinner.fail(chalk.red(`Generation failed: ${err.message}`));
+      spinner.fail(chalk.red(`Generation failed: ${sanitizeError(err)}`));
       process.exit(1);
     }
   });
@@ -184,7 +215,7 @@ program
 
       printCommercialHook();
     } catch (err: any) {
-      spinner.fail(chalk.red(`Retrieval failed: ${err.message}`));
+      spinner.fail(chalk.red(`Retrieval failed: ${sanitizeError(err)}`));
       process.exit(1);
     }
   });
@@ -228,7 +259,7 @@ program
 
       printCommercialHook();
     } catch (err: any) {
-      spinner.fail(chalk.red(`Analysis failed: ${err.message}`));
+      spinner.fail(chalk.red(`Analysis failed: ${sanitizeError(err)}`));
       process.exit(1);
     }
   });
@@ -305,7 +336,7 @@ program
 
       printCommercialHook();
     } catch (err: any) {
-      spinner.fail(chalk.red(`Probe failed: ${err.message}`));
+      spinner.fail(chalk.red(`Probe failed: ${sanitizeError(err)}`));
       process.exit(1);
     }
   });
